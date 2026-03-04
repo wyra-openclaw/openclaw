@@ -43,6 +43,24 @@ type LifecycleHost = {
 
 export function handleConnected(host: LifecycleHost) {
   host.basePath = inferBasePath();
+  const region = typeof import.meta.env.VITE_AWS_REGION === "string" ? import.meta.env.VITE_AWS_REGION : "";
+  const userPoolId =
+    typeof import.meta.env.VITE_COGNITO_USER_POOL_ID === "string"
+      ? import.meta.env.VITE_COGNITO_USER_POOL_ID
+      : "";
+  const clientId =
+    typeof import.meta.env.VITE_COGNITO_CLIENT_ID === "string"
+      ? import.meta.env.VITE_COGNITO_CLIENT_ID
+      : "";
+  const gatewayToken =
+    typeof import.meta.env.VITE_GATEWAY_TOKEN === "string" ? import.meta.env.VITE_GATEWAY_TOKEN : "";
+  console.log("[ui] auth env check", {
+    hasViteAwsRegion: Boolean(region.trim()),
+    hasViteCognitoUserPoolId: Boolean(userPoolId.trim()),
+    hasViteCognitoClientId: Boolean(clientId.trim()),
+    hasViteGatewayToken: Boolean(gatewayToken.trim()),
+    viteAwsRegion: region.trim() || null,
+  });
   void loadControlUiBootstrapConfig(host);
   applySettingsFromUrl(host as unknown as Parameters<typeof applySettingsFromUrl>[0]);
   syncTabWithLocation(host as unknown as Parameters<typeof syncTabWithLocation>[0], true);

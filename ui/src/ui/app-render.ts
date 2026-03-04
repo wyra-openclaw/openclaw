@@ -412,7 +412,7 @@ export function renderApp(state: AppViewState) {
                           saveAuthFlowState({ email });
                           state.isAuthenticated = true;
                           state.sessionKey = "main";
-                          const gatewayToken = state.settings.token.trim() || ENV_GATEWAY_TOKEN;
+                          const gatewayToken = ENV_GATEWAY_TOKEN || state.settings.token.trim();
                           state.applySettings({
                             ...state.settings,
                             token: gatewayToken,

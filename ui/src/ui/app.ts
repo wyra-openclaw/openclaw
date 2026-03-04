@@ -94,10 +94,6 @@ declare global {
 }
 
 const bootAssistantIdentity = normalizeAssistantIdentity({});
-const ENV_GATEWAY_TOKEN =
-  typeof import.meta.env.VITE_GATEWAY_TOKEN === "string"
-    ? import.meta.env.VITE_GATEWAY_TOKEN.trim()
-    : "";
 
 function resolveOnboardingMode(): boolean {
   if (!window.location.search) {
@@ -126,8 +122,7 @@ export class OpenClawApp extends LitElement {
   @state() password = "";
   @state() tab: Tab = "chat";
   @state() onboarding = resolveOnboardingMode();
-  @state() isAuthenticated =
-    hasValidStoredAccessToken() || Boolean(this.settings.token.trim() || ENV_GATEWAY_TOKEN);
+  @state() isAuthenticated = hasValidStoredAccessToken();
   @state() connected = false;
   @state() theme: ThemeMode = this.settings.theme ?? "system";
   @state() themeResolved: ResolvedTheme = "dark";

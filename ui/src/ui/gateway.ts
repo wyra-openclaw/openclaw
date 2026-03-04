@@ -5,7 +5,10 @@ import {
   type GatewayClientMode,
   type GatewayClientName,
 } from "../../../src/gateway/protocol/client-info.js";
-import { readConnectErrorDetailCode } from "../../../src/gateway/protocol/connect-error-details.js";
+import {
+  ConnectErrorDetailCodes,
+  readConnectErrorDetailCode,
+} from "../../../src/gateway/protocol/connect-error-details.js";
 import { clearDeviceAuthToken, loadDeviceAuthToken, storeDeviceAuthToken } from "./device-auth.ts";
 import { loadOrCreateDeviceIdentity, signDevicePayload } from "./device-identity.ts";
 import { generateUUID } from "./uuid.ts";
@@ -90,6 +93,14 @@ export type GatewayBrowserClientOptions = {
 
 // 4008 = application-defined code (browser rejects 1008 "Policy Violation")
 const CONNECT_FAILED_CLOSE_CODE = 4008;
+const NON_RETRYABLE_AUTH_ERROR_CODES = new Set<string>([
+  ConnectErrorDetailCodes.AUTH_RATE_LIMITED,
+  ConnectErrorDetailCodes.AUTH_TOKEN_MISMATCH,
+  ConnectErrorDetailCodes.AUTH_PASSWORD_MISMATCH,
+  ConnectErrorDetailCodes.AUTH_DEVICE_TOKEN_MISMATCH,
+  ConnectErrorDetailCodes.AUTH_TOKEN_NOT_CONFIGURED,
+  ConnectErrorDetailCodes.AUTH_PASSWORD_NOT_CONFIGURED,
+]);
 
 export class GatewayBrowserClient {
   private ws: WebSocket | null = null;
@@ -135,6 +146,10 @@ export class GatewayBrowserClient {
       this.ws = null;
       this.flushPending(new Error(`gateway closed (${ev.code}): ${reason}`));
       this.opts.onClose?.({ code: ev.code, reason, error: connectError });
+      const errorCode = readConnectErrorDetailCode(connectError?.details);
+      if (errorCode && NON_RETRYABLE_AUTH_ERROR_CODES.has(errorCode)) {
+        return;
+      }
       this.scheduleReconnect();
     });
     this.ws.addEventListener("error", () => {
@@ -185,7 +200,8 @@ export class GatewayBrowserClient {
         deviceId: deviceIdentity.deviceId,
         role,
       })?.token;
-      authToken = storedToken ?? this.opts.token;
+      // Prefer explicit shared/login token over cached device token.
+      authToken = this.opts.token ?? storedToken;
       canFallbackToShared = Boolean(storedToken && this.opts.token);
     }
     const auth =

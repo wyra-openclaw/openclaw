@@ -116,7 +116,9 @@ export function applySettingsFromUrl(host: SettingsHost) {
     if (token && token !== host.settings.token) {
       applySettings(host, { ...host.settings, token });
     }
-    if (token) {
+    // Only tokenized URLs can bootstrap auth state.
+    // Secret-manager or persisted token values should not auto-login after logout.
+    if (token && urlTokenRaw != null) {
       host.isAuthenticated = true;
     }
     if (urlTokenRaw != null) {

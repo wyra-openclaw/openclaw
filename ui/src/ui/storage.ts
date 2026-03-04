@@ -18,6 +18,25 @@ export type UiSettings = {
   locale?: string;
 };
 
+function normalizeGatewayUrl(candidate: unknown, fallback: string): string {
+  if (typeof candidate !== "string") {
+    return fallback;
+  }
+  const trimmed = candidate.trim();
+  if (!trimmed) {
+    return fallback;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== "ws:" && parsed.protocol !== "wss:") {
+      return fallback;
+    }
+    return trimmed;
+  } catch {
+    return fallback;
+  }
+}
+
 export function loadSettings(): UiSettings {
   const defaultUrl = (() => {
     const proto = location.protocol === "https:" ? "wss" : "ws";
@@ -51,10 +70,7 @@ export function loadSettings(): UiSettings {
     }
     const parsed = JSON.parse(raw) as Partial<UiSettings>;
     return {
-      gatewayUrl:
-        typeof parsed.gatewayUrl === "string" && parsed.gatewayUrl.trim()
-          ? parsed.gatewayUrl.trim()
-          : defaults.gatewayUrl,
+      gatewayUrl: normalizeGatewayUrl(parsed.gatewayUrl, defaults.gatewayUrl),
       token: typeof parsed.token === "string" ? parsed.token : defaults.token,
       sessionKey:
         typeof parsed.sessionKey === "string" && parsed.sessionKey.trim()

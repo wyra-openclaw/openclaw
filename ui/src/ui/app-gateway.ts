@@ -44,6 +44,11 @@ import type {
   UpdateAvailable,
 } from "./types.ts";
 
+const ENV_GATEWAY_TOKEN =
+  typeof import.meta.env.VITE_GATEWAY_TOKEN === "string"
+    ? import.meta.env.VITE_GATEWAY_TOKEN.trim()
+    : "";
+
 type GatewayHost = {
   settings: UiSettings;
   password: string;
@@ -146,9 +151,10 @@ export function connectGateway(host: GatewayHost) {
   host.execApprovalError = null;
 
   const previousClient = host.client;
+  const preferredGatewayToken = ENV_GATEWAY_TOKEN || host.settings.token.trim();
   const client = new GatewayBrowserClient({
     url: host.settings.gatewayUrl,
-    token: host.settings.token.trim() ? host.settings.token : undefined,
+    token: preferredGatewayToken || undefined,
     password: host.password.trim() ? host.password : undefined,
     clientName: "openclaw-control-ui",
     mode: "webchat",
