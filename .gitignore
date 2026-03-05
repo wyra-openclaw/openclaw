@@ -1,6 +1,5 @@
 node_modules
 **/node_modules/
-.env
 ui/.env.local
 ui/.env.*.local
 docker-compose.extra.yml
