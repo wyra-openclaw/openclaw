@@ -82,6 +82,7 @@ type GatewayHost = {
   assistantName: string;
   assistantAvatar: string | null;
   assistantAgentId: string | null;
+  serverVersion: string | null;
   sessionKey: string;
   chatRunId: string | null;
   refreshSessionsAfterChat: Set<string>;
@@ -96,6 +97,33 @@ type SessionDefaultsSnapshot = {
   mainSessionKey?: string;
   scope?: string;
 };
+
+export function resolveControlUiClientVersion(params: {
+  gatewayUrl: string;
+  serverVersion: string | null;
+  pageUrl?: string;
+}): string | undefined {
+  const serverVersion = params.serverVersion?.trim();
+  if (!serverVersion) {
+    return undefined;
+  }
+  const pageUrl =
+    params.pageUrl ?? (typeof window === "undefined" ? undefined : window.location.href);
+  if (!pageUrl) {
+    return undefined;
+  }
+  try {
+    const page = new URL(pageUrl);
+    const gateway = new URL(params.gatewayUrl, page);
+    const allowedProtocols = new Set(["ws:", "wss:", "http:", "https:"]);
+    if (!allowedProtocols.has(gateway.protocol) || gateway.host !== page.host) {
+      return undefined;
+    }
+    return serverVersion;
+  } catch {
+    return undefined;
+  }
+}
 
 function normalizeSessionKeyForDefaults(
   value: string | undefined,
@@ -164,6 +192,7 @@ export function connectGateway(host: GatewayHost) {
     token: preferredGatewayToken || undefined,
     password: host.password.trim() ? host.password : undefined,
     clientName: "openclaw-control-ui",
+    clientVersion,
     mode: "webchat",
     instanceId: host.clientInstanceId,
     onHello: (hello) => {

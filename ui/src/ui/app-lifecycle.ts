@@ -32,6 +32,7 @@ type LifecycleHost = {
   assistantName: string;
   assistantAvatar: string | null;
   assistantAgentId: string | null;
+  serverVersion: string | null;
   chatHasAutoScrolled: boolean;
   chatManualRefreshInFlight: boolean;
   chatLoading: boolean;
@@ -46,6 +47,7 @@ type LifecycleHost = {
 };
 
 export function handleConnected(host: LifecycleHost) {
+  const connectGeneration = ++host.connectGeneration;
   host.basePath = inferBasePath();
   const runtimeConfig = (
     window as Window & {
@@ -94,6 +96,7 @@ export function handleFirstUpdated(host: LifecycleHost) {
 }
 
 export function handleDisconnected(host: LifecycleHost) {
+  host.connectGeneration += 1;
   window.removeEventListener("popstate", host.popStateHandler);
   stopNodesPolling(host as unknown as Parameters<typeof stopNodesPolling>[0]);
   stopLogsPolling(host as unknown as Parameters<typeof stopLogsPolling>[0]);
