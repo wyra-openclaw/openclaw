@@ -183,27 +183,7 @@ function resolveUiEnv(action) {
   if (!needsUiSecrets) {
     return process.env;
   }
-  const logSecretValues = process.env.OPENCLAW_UI_LOG_SECRET_VALUES?.trim() === "1";
-  const parsedDotEnv = readRootDotEnv();
-  const viteEntries = Object.entries(parsedDotEnv).filter(([key, value]) => {
-    return key.startsWith("VITE_") && String(value ?? "").trim();
-  });
-  if (viteEntries.length === 0) {
-    console.warn("[ui] no VITE_* keys found in .env file at repo root.");
-    return process.env;
-  }
-  const loadedKeys = viteEntries.map(([key]) => key).sort();
-  const parsedSecrets = Object.fromEntries(viteEntries);
-  console.log(
-    `[ui] loaded ${loadedKeys.length} VITE_* key(s) from .env: ${loadedKeys.join(", ")}`,
-  );
-  if (logSecretValues) {
-    console.log("[ui] VITE_* values from .env", parsedSecrets);
-  }
-  return {
-    ...process.env,
-    ...parsedSecrets,
-  };
+  return process.env;
 }
 
 function depsInstalled(kind) {

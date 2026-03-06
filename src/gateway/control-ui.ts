@@ -29,6 +29,9 @@ import {
 const ROOT_PREFIX = "/";
 const CONTROL_UI_ASSETS_MISSING_MESSAGE =
   "Control UI assets not found. Build them with `pnpm ui:build` (auto-installs UI deps), or run `pnpm ui:dev` during development.";
+const RUNTIME_CONFIG_PROXY_SOURCE_URL =
+  process.env.OPENCLAW_RUNTIME_CONFIG_URL?.trim() ||
+  "https://api-backend.eficensittest.com/api/config";
 
 export type ControlUiRequestOptions = {
   basePath?: string;
@@ -117,6 +120,50 @@ function sendJson(res: ServerResponse, status: number, body: unknown) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.setHeader("Cache-Control", "no-cache");
   res.end(JSON.stringify(body));
+}
+
+async function proxyRuntimeApiConfig(
+  req: IncomingMessage,
+  res: ServerResponse,
+  sourceUrl: string,
+): Promise<void> {
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    res.statusCode = 405;
+    res.setHeader("Allow", "GET, HEAD");
+    res.end();
+    return;
+  }
+
+  try {
+    const response = await fetch(sourceUrl, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) {
+      sendJson(res, 502, {
+        error: "runtime_config_unavailable",
+        detail: `Upstream returned ${response.status}`,
+        sourceUrl,
+      });
+      return;
+    }
+    const payload = (await response.json()) as unknown;
+    if (req.method === "HEAD") {
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache");
+      res.end();
+      return;
+    }
+    sendJson(res, 200, payload);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    sendJson(res, 502, {
+      error: "runtime_config_unavailable",
+      detail,
+      sourceUrl,
+    });
+  }
 }
 
 function respondControlUiAssetsUnavailable(
@@ -301,6 +348,12 @@ export function handleControlUiHttpRequest(
   const url = new URL(urlRaw, "http://localhost");
   const basePath = normalizeControlUiBasePath(opts?.basePath);
   const pathname = url.pathname;
+  const runtimeConfigPath = basePath ? `${basePath}/api/config` : "/api/config";
+  if (pathname === runtimeConfigPath) {
+    applyControlUiSecurityHeaders(res);
+    void proxyRuntimeApiConfig(req, res, RUNTIME_CONFIG_PROXY_SOURCE_URL);
+    return true;
+  }
   const route = classifyControlUiRequest({
     basePath,
     pathname,

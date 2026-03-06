@@ -44,10 +44,17 @@ import type {
   UpdateAvailable,
 } from "./types.ts";
 
-const ENV_GATEWAY_TOKEN =
-  typeof import.meta.env.VITE_GATEWAY_TOKEN === "string"
-    ? import.meta.env.VITE_GATEWAY_TOKEN.trim()
-    : "";
+function readRuntimeGatewayToken(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  const cfg = (
+    window as Window & {
+      __OPENCLAW_API_CONFIG__?: { gatewayToken?: string };
+    }
+  ).__OPENCLAW_API_CONFIG__;
+  return typeof cfg?.gatewayToken === "string" ? cfg.gatewayToken.trim() : "";
+}
 
 type GatewayHost = {
   settings: UiSettings;
@@ -151,7 +158,7 @@ export function connectGateway(host: GatewayHost) {
   host.execApprovalError = null;
 
   const previousClient = host.client;
-  const preferredGatewayToken = ENV_GATEWAY_TOKEN || host.settings.token.trim();
+  const preferredGatewayToken = host.settings.token.trim() || readRuntimeGatewayToken();
   const client = new GatewayBrowserClient({
     url: host.settings.gatewayUrl,
     token: preferredGatewayToken || undefined,

@@ -1,5 +1,10 @@
 import "./styles.css";
-import "./ui/app.ts";
+import { refreshRuntimeApiConfig } from "./ui/auth/cognito-client.ts";
+
+async function bootstrap() {
+  await refreshRuntimeApiConfig();
+  await import("./ui/app.ts");
+}
 
 // Some browser extensions inject async message listeners that can emit
 // this noisy rejection in page apps. Ignore only this known extension error.
@@ -19,3 +24,5 @@ window.addEventListener("unhandledrejection", (event) => {
     event.preventDefault();
   }
 });
+
+void bootstrap();

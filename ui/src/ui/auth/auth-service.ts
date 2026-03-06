@@ -7,7 +7,12 @@ import {
   ResendConfirmationCodeCommand,
   SignUpCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
-import { assertCognitoConfig, COGNITO_CONFIG, cognitoClient } from "./cognito-client.ts";
+import {
+  assertCognitoConfig,
+  getCognitoClient,
+  getCognitoConfig,
+  refreshRuntimeApiConfig,
+} from "./cognito-client.ts";
 import { isTokenExpired } from "./jwt.ts";
 import {
   clearStoredTokens,
@@ -83,11 +88,19 @@ function toTokens(
 
 let refreshInFlight: Promise<AuthTokens> | null = null;
 
-export async function signUp(email: string, password: string) {
+async function getAuthClientContext() {
+  await refreshRuntimeApiConfig({ required: true });
   assertCognitoConfig();
-  return cognitoClient.send(
+  const client = getCognitoClient();
+  const { clientId } = getCognitoConfig();
+  return { client, clientId };
+}
+
+export async function signUp(email: string, password: string) {
+  const { client, clientId } = await getAuthClientContext();
+  return client.send(
     new SignUpCommand({
-      ClientId: COGNITO_CONFIG.clientId,
+      ClientId: clientId,
       Username: email,
       Password: password,
       UserAttributes: [{ Name: "email", Value: email }],
@@ -96,10 +109,10 @@ export async function signUp(email: string, password: string) {
 }
 
 export async function verifySignUpOtp(email: string, code: string) {
-  assertCognitoConfig();
-  return cognitoClient.send(
+  const { client, clientId } = await getAuthClientContext();
+  return client.send(
     new ConfirmSignUpCommand({
-      ClientId: COGNITO_CONFIG.clientId,
+      ClientId: clientId,
       Username: email,
       ConfirmationCode: code,
     }),
@@ -107,20 +120,20 @@ export async function verifySignUpOtp(email: string, code: string) {
 }
 
 export async function resendSignUpOtp(email: string) {
-  assertCognitoConfig();
-  return cognitoClient.send(
+  const { client, clientId } = await getAuthClientContext();
+  return client.send(
     new ResendConfirmationCodeCommand({
-      ClientId: COGNITO_CONFIG.clientId,
+      ClientId: clientId,
       Username: email,
     }),
   );
 }
 
 export async function login(email: string, password: string, persist = true) {
-  assertCognitoConfig();
-  const result = await cognitoClient.send(
+  const { client, clientId } = await getAuthClientContext();
+  const result = await client.send(
     new InitiateAuthCommand({
-      ClientId: COGNITO_CONFIG.clientId,
+      ClientId: clientId,
       AuthFlow: "USER_PASSWORD_AUTH",
       AuthParameters: {
         USERNAME: email,
@@ -134,20 +147,20 @@ export async function login(email: string, password: string, persist = true) {
 }
 
 export async function requestForgotPasswordOtp(email: string) {
-  assertCognitoConfig();
-  return cognitoClient.send(
+  const { client, clientId } = await getAuthClientContext();
+  return client.send(
     new ForgotPasswordCommand({
-      ClientId: COGNITO_CONFIG.clientId,
+      ClientId: clientId,
       Username: email,
     }),
   );
 }
 
 export async function resetPasswordWithOtp(email: string, code: string, nextPassword: string) {
-  assertCognitoConfig();
-  return cognitoClient.send(
+  const { client, clientId } = await getAuthClientContext();
+  return client.send(
     new ConfirmForgotPasswordCommand({
-      ClientId: COGNITO_CONFIG.clientId,
+      ClientId: clientId,
       Username: email,
       ConfirmationCode: code,
       Password: nextPassword,
@@ -160,9 +173,10 @@ export async function refreshTokens() {
   if (!current?.refreshToken) {
     throw new Error("Missing refresh token.");
   }
-  const result = await cognitoClient.send(
+  const { client, clientId } = await getAuthClientContext();
+  const result = await client.send(
     new InitiateAuthCommand({
-      ClientId: COGNITO_CONFIG.clientId,
+      ClientId: clientId,
       AuthFlow: "REFRESH_TOKEN_AUTH",
       AuthParameters: {
         REFRESH_TOKEN: current.refreshToken,
@@ -195,7 +209,8 @@ export async function logout() {
   const current = getStoredTokens();
   try {
     if (current?.accessToken) {
-      await cognitoClient.send(
+      const client = getCognitoClient();
+      await client.send(
         new GlobalSignOutCommand({
           AccessToken: current.accessToken,
         }),

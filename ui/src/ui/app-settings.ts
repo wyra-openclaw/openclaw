@@ -40,6 +40,18 @@ import { startThemeTransition, type ThemeTransitionContext } from "./theme-trans
 import { resolveTheme, type ResolvedTheme, type ThemeMode } from "./theme.ts";
 import type { AgentsListResult } from "./types.ts";
 
+function readRuntimeGatewayToken(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  const cfg = (
+    window as Window & {
+      __OPENCLAW_API_CONFIG__?: { gatewayToken?: string };
+    }
+  ).__OPENCLAW_API_CONFIG__;
+  return typeof cfg?.gatewayToken === "string" ? cfg.gatewayToken.trim() : "";
+}
+
 type SettingsHost = {
   settings: UiSettings;
   password?: string;
@@ -101,11 +113,8 @@ export function applySettingsFromUrl(host: SettingsHost) {
   const bareHashToken =
     normalizedHash && !normalizedHash.includes("=") ? normalizedHash.trim() : null;
   const urlTokenRaw = params.get("token") ?? hashParams.get("token") ?? bareHashToken;
-  const envToken =
-    typeof import.meta.env.VITE_GATEWAY_TOKEN === "string"
-      ? import.meta.env.VITE_GATEWAY_TOKEN.trim()
-      : "";
-  const tokenRaw = urlTokenRaw ?? (envToken && !host.settings.token.trim() ? envToken : null);
+  const runtimeToken = readRuntimeGatewayToken();
+  const tokenRaw = urlTokenRaw ?? (runtimeToken || null);
   const passwordRaw = params.get("password") ?? hashParams.get("password");
   const sessionRaw = params.get("session") ?? hashParams.get("session");
   const gatewayUrlRaw = params.get("gatewayUrl") ?? hashParams.get("gatewayUrl");

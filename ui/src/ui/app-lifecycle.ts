@@ -24,6 +24,10 @@ type LifecycleHost = {
   client?: { stop: () => void } | null;
   isAuthenticated?: boolean;
   connected?: boolean;
+  settings: {
+    token: string;
+  };
+  applySettings: (next: unknown) => void;
   tab: Tab;
   assistantName: string;
   assistantAvatar: string | null;
@@ -43,23 +47,29 @@ type LifecycleHost = {
 
 export function handleConnected(host: LifecycleHost) {
   host.basePath = inferBasePath();
-  const region = typeof import.meta.env.VITE_AWS_REGION === "string" ? import.meta.env.VITE_AWS_REGION : "";
-  const userPoolId =
-    typeof import.meta.env.VITE_COGNITO_USER_POOL_ID === "string"
-      ? import.meta.env.VITE_COGNITO_USER_POOL_ID
-      : "";
-  const clientId =
-    typeof import.meta.env.VITE_COGNITO_CLIENT_ID === "string"
-      ? import.meta.env.VITE_COGNITO_CLIENT_ID
-      : "";
-  const gatewayToken =
-    typeof import.meta.env.VITE_GATEWAY_TOKEN === "string" ? import.meta.env.VITE_GATEWAY_TOKEN : "";
-  console.log("[ui] auth env check", {
-    hasViteAwsRegion: Boolean(region.trim()),
-    hasViteCognitoUserPoolId: Boolean(userPoolId.trim()),
-    hasViteCognitoClientId: Boolean(clientId.trim()),
-    hasViteGatewayToken: Boolean(gatewayToken.trim()),
-    viteAwsRegion: region.trim() || null,
+  const runtimeConfig = (
+    window as Window & {
+      __OPENCLAW_API_CONFIG__?: {
+        region?: string;
+        userPoolId?: string;
+        clientId?: string;
+        gatewayToken?: string;
+      };
+    }
+  ).__OPENCLAW_API_CONFIG__;
+  const runtimeToken =
+    typeof runtimeConfig?.gatewayToken === "string" ? runtimeConfig.gatewayToken.trim() : "";
+  if (runtimeToken && runtimeToken !== host.settings.token.trim()) {
+    host.applySettings({
+      ...host.settings,
+      token: runtimeToken,
+    });
+  }
+  console.log("[ui] runtime api config check", {
+    hasRegion: Boolean(runtimeConfig?.region?.trim()),
+    hasUserPoolId: Boolean(runtimeConfig?.userPoolId?.trim()),
+    hasClientId: Boolean(runtimeConfig?.clientId?.trim()),
+    hasGatewayToken: Boolean(runtimeToken),
   });
   void loadControlUiBootstrapConfig(host);
   applySettingsFromUrl(host as unknown as Parameters<typeof applySettingsFromUrl>[0]);
