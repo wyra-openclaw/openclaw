@@ -18,6 +18,7 @@ import {
 import { parseDurationMs } from "../../cli/parse-duration.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { parsePreparedSystemRunPayload } from "../../infra/system-run-approval-context.js";
+import { formatExecCommand } from "../../infra/system-run-command.js";
 import { imageMimeFromFormat } from "../../media/mime.js";
 import type { GatewayMessageChannel } from "../../utils/message-channel.js";
 import { resolveSessionAgentId } from "../agent-scope.js";
@@ -650,6 +651,7 @@ export function createNodesTool(options?: {
                 command: "system.run.prepare",
                 params: {
                   command,
+                  rawCommand: formatExecCommand(command),
                   cwd,
                   agentId,
                   sessionKey,

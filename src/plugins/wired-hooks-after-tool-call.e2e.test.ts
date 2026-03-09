@@ -1,8 +1,7 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * Test: after_tool_call hook wiring (pi-embedded-subscribe.handlers.tools.ts)
  */
-import { createBaseToolHandlerState } from "../agents/pi-tool-handler-state.test-helpers.js";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const hookMocks = vi.hoisted(() => ({
   runner: {
@@ -39,7 +38,17 @@ function createToolHandlerCtx(params: {
     },
     state: {
       toolMetaById: new Map<string, string | undefined>(),
-      ...createBaseToolHandlerState(),
+      toolMetas: [] as Array<{ toolName?: string; meta?: string }>,
+      toolSummaryById: new Set<string>(),
+      lastToolError: undefined,
+      pendingMessagingTexts: new Map<string, string>(),
+      pendingMessagingTargets: new Map<string, unknown>(),
+      pendingMessagingMediaUrls: new Map<string, string[]>(),
+      messagingToolSentTexts: [] as string[],
+      messagingToolSentTextsNormalized: [] as string[],
+      messagingToolSentMediaUrls: [] as string[],
+      messagingToolSentTargets: [] as unknown[],
+      blockBuffer: "",
     },
     log: { debug: vi.fn(), warn: vi.fn() },
     flushBlockReplyBuffer: vi.fn(),

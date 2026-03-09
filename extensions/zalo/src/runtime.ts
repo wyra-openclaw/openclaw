@@ -1,6 +1,14 @@
-import { createPluginRuntimeStore } from "openclaw/plugin-sdk/compat";
 import type { PluginRuntime } from "openclaw/plugin-sdk/zalo";
 
-const { setRuntime: setZaloRuntime, getRuntime: getZaloRuntime } =
-  createPluginRuntimeStore<PluginRuntime>("Zalo runtime not initialized");
-export { getZaloRuntime, setZaloRuntime };
+let runtime: PluginRuntime | null = null;
+
+export function setZaloRuntime(next: PluginRuntime): void {
+  runtime = next;
+}
+
+export function getZaloRuntime(): PluginRuntime {
+  if (!runtime) {
+    throw new Error("Zalo runtime not initialized");
+  }
+  return runtime;
+}

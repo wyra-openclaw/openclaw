@@ -1,5 +1,4 @@
 import { resolveBrowserExecutableForPlatform } from "../chrome.executables.js";
-import { toBrowserErrorResponse } from "../errors.js";
 import { createBrowserProfilesService } from "../profiles-service.js";
 import type { BrowserRouteContext, ProfileContext } from "../server-context.js";
 import { resolveProfileContext } from "./agent.shared.js";
@@ -19,10 +18,6 @@ async function withBasicProfileRoute(params: {
   try {
     await params.run(profileCtx);
   } catch (err) {
-    const mapped = toBrowserErrorResponse(err);
-    if (mapped) {
-      return jsonError(params.res, mapped.status, mapped.message);
-    }
     jsonError(params.res, 500, String(err));
   }
 }
@@ -162,11 +157,20 @@ export function registerBrowserBasicRoutes(app: BrowserRouteRegistrar, ctx: Brow
       });
       res.json(result);
     } catch (err) {
-      const mapped = toBrowserErrorResponse(err);
-      if (mapped) {
-        return jsonError(res, mapped.status, mapped.message);
+      const msg = String(err);
+      if (msg.includes("already exists")) {
+        return jsonError(res, 409, msg);
       }
-      jsonError(res, 500, String(err));
+      if (msg.includes("invalid profile name")) {
+        return jsonError(res, 400, msg);
+      }
+      if (msg.includes("no available CDP ports")) {
+        return jsonError(res, 507, msg);
+      }
+      if (msg.includes("cdpUrl")) {
+        return jsonError(res, 400, msg);
+      }
+      jsonError(res, 500, msg);
     }
   });
 
@@ -182,11 +186,17 @@ export function registerBrowserBasicRoutes(app: BrowserRouteRegistrar, ctx: Brow
       const result = await service.deleteProfile(name);
       res.json(result);
     } catch (err) {
-      const mapped = toBrowserErrorResponse(err);
-      if (mapped) {
-        return jsonError(res, mapped.status, mapped.message);
+      const msg = String(err);
+      if (msg.includes("invalid profile name")) {
+        return jsonError(res, 400, msg);
       }
-      jsonError(res, 500, String(err));
+      if (msg.includes("default profile")) {
+        return jsonError(res, 400, msg);
+      }
+      if (msg.includes("not found")) {
+        return jsonError(res, 404, msg);
+      }
+      jsonError(res, 500, msg);
     }
   });
 }

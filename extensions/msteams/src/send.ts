@@ -157,13 +157,24 @@ export async function sendMessageMSTeams(
 
       log.debug?.("sending file consent card", { uploadId, fileName, size: media.buffer.length });
 
-      const messageId = await sendProactiveActivity({
-        adapter,
-        appId,
-        ref,
-        activity,
-        errorPrefix: "msteams consent card send",
-      });
+      const baseRef = buildConversationReference(ref);
+      const proactiveRef = { ...baseRef, activityId: undefined };
+
+      let messageId = "unknown";
+      try {
+        await adapter.continueConversation(appId, proactiveRef, async (turnCtx) => {
+          const response = await turnCtx.sendActivity(activity);
+          messageId = extractMessageId(response) ?? "unknown";
+        });
+      } catch (err) {
+        const classification = classifyMSTeamsSendError(err);
+        const hint = formatMSTeamsSendErrorHint(classification);
+        const status = classification.statusCode ? ` (HTTP ${classification.statusCode})` : "";
+        throw new Error(
+          `msteams consent card send failed${status}: ${formatUnknownError(err)}${hint ? ` (${hint})` : ""}`,
+          { cause: err },
+        );
+      }
 
       log.info("sent file consent card", { conversationId, messageId, uploadId });
 
@@ -234,11 +245,14 @@ export async function sendMessageMSTeams(
           text: messageText || undefined,
           attachments: [fileCardAttachment],
         };
-        const messageId = await sendProactiveActivityRaw({
-          adapter,
-          appId,
-          ref,
-          activity,
+
+        const baseRef = buildConversationReference(ref);
+        const proactiveRef = { ...baseRef, activityId: undefined };
+
+        let messageId = "unknown";
+        await adapter.continueConversation(appId, proactiveRef, async (turnCtx) => {
+          const response = await turnCtx.sendActivity(activity);
+          messageId = extractMessageId(response) ?? "unknown";
         });
 
         log.info("sent native file card", {
@@ -274,11 +288,14 @@ export async function sendMessageMSTeams(
         type: "message",
         text: messageText ? `${messageText}\n\n${fileLink}` : fileLink,
       };
-      const messageId = await sendProactiveActivityRaw({
-        adapter,
-        appId,
-        ref,
-        activity,
+
+      const baseRef = buildConversationReference(ref);
+      const proactiveRef = { ...baseRef, activityId: undefined };
+
+      let messageId = "unknown";
+      await adapter.continueConversation(appId, proactiveRef, async (turnCtx) => {
+        const response = await turnCtx.sendActivity(activity);
+        messageId = extractMessageId(response) ?? "unknown";
       });
 
       log.info("sent message with OneDrive file link", {
@@ -365,28 +382,6 @@ type ProactiveActivityParams = {
   errorPrefix: string;
 };
 
-type ProactiveActivityRawParams = Omit<ProactiveActivityParams, "errorPrefix">;
-
-async function sendProactiveActivityRaw({
-  adapter,
-  appId,
-  ref,
-  activity,
-}: ProactiveActivityRawParams): Promise<string> {
-  const baseRef = buildConversationReference(ref);
-  const proactiveRef = {
-    ...baseRef,
-    activityId: undefined,
-  };
-
-  let messageId = "unknown";
-  await adapter.continueConversation(appId, proactiveRef, async (ctx) => {
-    const response = await ctx.sendActivity(activity);
-    messageId = extractMessageId(response) ?? "unknown";
-  });
-  return messageId;
-}
-
 async function sendProactiveActivity({
   adapter,
   appId,
@@ -394,13 +389,19 @@ async function sendProactiveActivity({
   activity,
   errorPrefix,
 }: ProactiveActivityParams): Promise<string> {
+  const baseRef = buildConversationReference(ref);
+  const proactiveRef = {
+    ...baseRef,
+    activityId: undefined,
+  };
+
+  let messageId = "unknown";
   try {
-    return await sendProactiveActivityRaw({
-      adapter,
-      appId,
-      ref,
-      activity,
+    await adapter.continueConversation(appId, proactiveRef, async (ctx) => {
+      const response = await ctx.sendActivity(activity);
+      messageId = extractMessageId(response) ?? "unknown";
     });
+    return messageId;
   } catch (err) {
     const classification = classifyMSTeamsSendError(err);
     const hint = formatMSTeamsSendErrorHint(classification);

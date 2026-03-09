@@ -3,7 +3,7 @@ import OpenClawKit
 import Testing
 @testable import OpenClaw
 
-struct GatewayChannelRequestTests {
+@Suite struct GatewayChannelRequestTests {
     private func makeSession(requestSendDelayMs: Int) -> GatewayTestWebSocketSession {
         GatewayTestWebSocketSession(
             taskFactory: {
@@ -16,7 +16,7 @@ struct GatewayChannelRequestTests {
             })
     }
 
-    @Test func `request timeout then send failure does not double resume`() async throws {
+    @Test func requestTimeoutThenSendFailureDoesNotDoubleResume() async throws {
         let session = self.makeSession(requestSendDelayMs: 100)
         let channel = try GatewayChannelActor(
             url: #require(URL(string: "ws://example.invalid")),

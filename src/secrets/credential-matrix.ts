@@ -6,7 +6,7 @@ type CredentialMatrixEntry = {
   path: string;
   refPath?: string;
   when?: { type: "api_key" | "token" };
-  secretShape: "secret_input" | "sibling_ref"; // pragma: allowlist secret
+  secretShape: "secret_input" | "sibling_ref";
   optIn: true;
   notes?: string;
 };

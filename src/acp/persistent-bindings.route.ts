@@ -1,6 +1,5 @@
 import type { OpenClawConfig } from "../config/config.js";
 import type { ResolvedAgentRoute } from "../routing/resolve-route.js";
-import { deriveLastRoutePolicy } from "../routing/resolve-route.js";
 import { resolveAgentIdFromSessionKey } from "../routing/session-key.js";
 import {
   ensureConfiguredAcpBindingSession,
@@ -51,10 +50,6 @@ export function resolveConfiguredAcpRoute(params: {
       ...params.route,
       sessionKey: boundSessionKey,
       agentId: boundAgentId,
-      lastRoutePolicy: deriveLastRoutePolicy({
-        sessionKey: boundSessionKey,
-        mainSessionKey: params.route.mainSessionKey,
-      }),
       matchedBy: "binding.channel",
     },
   };

@@ -1,9 +1,9 @@
 import {
   GROUP_POLICY_BLOCKED_LABEL,
   createScopedPairingAccess,
-  dispatchInboundReplyWithBase,
+  createNormalizedOutboundDeliverer,
+  createReplyPrefixOptions,
   formatTextWithAttachmentLinks,
-  issuePairingChallenge,
   logInboundDrop,
   isDangerousNameMatchingEnabled,
   readStoreAllowFromForDmPolicy,
@@ -209,25 +209,28 @@ export async function handleIrcInbound(params: {
       }).allowed;
       if (!dmAllowed) {
         if (dmPolicy === "pairing") {
-          await issuePairingChallenge({
-            channel: CHANNEL_ID,
-            senderId: senderDisplay.toLowerCase(),
-            senderIdLine: `Your IRC id: ${senderDisplay}`,
+          const { code, created } = await pairing.upsertPairingRequest({
+            id: senderDisplay.toLowerCase(),
             meta: { name: message.senderNick || undefined },
-            upsertPairingRequest: pairing.upsertPairingRequest,
-            sendPairingReply: async (text) => {
+          });
+          if (created) {
+            try {
+              const reply = core.channel.pairing.buildPairingReply({
+                channel: CHANNEL_ID,
+                idLine: `Your IRC id: ${senderDisplay}`,
+                code,
+              });
               await deliverIrcReply({
-                payload: { text },
+                payload: { text: reply },
                 target: message.senderNick,
                 accountId: account.accountId,
                 sendReply: params.sendReply,
                 statusSink,
               });
-            },
-            onReplyError: (err) => {
+            } catch (err) {
               runtime.error?.(`irc: pairing reply failed for ${senderDisplay}: ${String(err)}`);
-            },
-          });
+            }
+          }
         }
         runtime.log?.(`irc: drop DM sender ${senderDisplay} (dmPolicy=${dmPolicy})`);
         return;
@@ -329,31 +332,44 @@ export async function handleIrcInbound(params: {
     CommandAuthorized: commandAuthorized,
   });
 
-  await dispatchInboundReplyWithBase({
-    cfg: config as OpenClawConfig,
-    channel: CHANNEL_ID,
-    accountId: account.accountId,
-    route,
+  await core.channel.session.recordInboundSession({
     storePath,
-    ctxPayload,
-    core,
-    deliver: async (payload) => {
-      await deliverIrcReply({
-        payload,
-        target: peerId,
-        accountId: account.accountId,
-        sendReply: params.sendReply,
-        statusSink,
-      });
-    },
+    sessionKey: ctxPayload.SessionKey ?? route.sessionKey,
+    ctx: ctxPayload,
     onRecordError: (err) => {
       runtime.error?.(`irc: failed updating session meta: ${String(err)}`);
     },
-    onDispatchError: (err, info) => {
-      runtime.error?.(`irc ${info.kind} reply failed: ${String(err)}`);
+  });
+
+  const { onModelSelected, ...prefixOptions } = createReplyPrefixOptions({
+    cfg: config as OpenClawConfig,
+    agentId: route.agentId,
+    channel: CHANNEL_ID,
+    accountId: account.accountId,
+  });
+  const deliverReply = createNormalizedOutboundDeliverer(async (payload) => {
+    await deliverIrcReply({
+      payload,
+      target: peerId,
+      accountId: account.accountId,
+      sendReply: params.sendReply,
+      statusSink,
+    });
+  });
+
+  await core.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
+    ctx: ctxPayload,
+    cfg: config as OpenClawConfig,
+    dispatcherOptions: {
+      ...prefixOptions,
+      deliver: deliverReply,
+      onError: (err, info) => {
+        runtime.error?.(`irc ${info.kind} reply failed: ${String(err)}`);
+      },
     },
     replyOptions: {
       skillFilter: groupMatch.groupConfig?.skills,
+      onModelSelected,
       disableBlockStreaming:
         typeof account.config.blockStreaming === "boolean"
           ? !account.config.blockStreaming

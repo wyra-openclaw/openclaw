@@ -91,8 +91,7 @@ export async function applyNonInteractiveAuthChoice(params: {
     ? { secretInputMode: requestedSecretInputMode }
     : undefined;
   const toStoredSecretInput = (resolved: ResolvedNonInteractiveApiKey): SecretInput | null => {
-    const storePlaintextSecret = requestedSecretInputMode !== "ref"; // pragma: allowlist secret
-    if (storePlaintextSecret) {
+    if (requestedSecretInputMode !== "ref") {
       return resolved.key;
     }
     if (resolved.source !== "env") {
@@ -949,8 +948,7 @@ export async function applyNonInteractiveAuthChoice(params: {
       });
       let customApiKeyInput: SecretInput | undefined;
       if (resolvedCustomApiKey) {
-        const storeCustomApiKeyAsRef = requestedSecretInputMode === "ref"; // pragma: allowlist secret
-        if (storeCustomApiKeyAsRef) {
+        if (requestedSecretInputMode === "ref") {
           const stored = toStoredSecretInput(resolvedCustomApiKey);
           if (!stored) {
             return null;

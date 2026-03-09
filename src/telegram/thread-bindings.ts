@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { resolveThreadBindingConversationIdFromBindingId } from "../channels/thread-binding-id.js";
 import { formatThreadBindingDurationLabel } from "../channels/thread-bindings-messages.js";
 import { resolveStateDir } from "../config/paths.js";
 import { logVerbose } from "../globals.js";
@@ -313,6 +312,22 @@ async function persistBindingsToDisk(params: {
   });
 }
 
+function resolveThreadIdFromBindingId(params: {
+  accountId: string;
+  bindingId?: string;
+}): string | undefined {
+  const bindingId = params.bindingId?.trim();
+  if (!bindingId) {
+    return undefined;
+  }
+  const prefix = `${params.accountId}:`;
+  if (!bindingId.startsWith(prefix)) {
+    return undefined;
+  }
+  const conversationId = bindingId.slice(prefix.length).trim();
+  return conversationId || undefined;
+}
+
 function normalizeTimestampMs(raw: unknown): number {
   if (typeof raw !== "number" || !Number.isFinite(raw)) {
     return Date.now();
@@ -560,7 +575,7 @@ export function createTelegramThreadBindingManager(
         : null;
     },
     touch: (bindingId, at) => {
-      const conversationId = resolveThreadBindingConversationIdFromBindingId({
+      const conversationId = resolveThreadIdFromBindingId({
         accountId,
         bindingId,
       });
@@ -583,7 +598,7 @@ export function createTelegramThreadBindingManager(
           }),
         );
       }
-      const conversationId = resolveThreadBindingConversationIdFromBindingId({
+      const conversationId = resolveThreadIdFromBindingId({
         accountId,
         bindingId: input.bindingId,
       });

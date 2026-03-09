@@ -1,8 +1,7 @@
 import { resolveCommandSecretRefsViaGateway } from "../cli/command-secret-gateway.js";
 import { getStatusCommandSecretTargetIds } from "../cli/command-secret-targets.js";
 import { withProgress } from "../cli/progress.js";
-import type { OpenClawConfig } from "../config/config.js";
-import { readBestEffortConfig } from "../config/config.js";
+import { loadConfig } from "../config/config.js";
 import { buildGatewayConnectionDetails, callGateway } from "../gateway/call.js";
 import { normalizeControlUiBasePath } from "../gateway/control-ui-shared.js";
 import { probeGateway } from "../gateway/probe.js";
@@ -60,7 +59,7 @@ function unwrapDeferredResult<T>(result: DeferredResult<T>): T {
   return result.value;
 }
 
-function resolveMemoryPluginStatus(cfg: OpenClawConfig): MemoryPluginStatus {
+function resolveMemoryPluginStatus(cfg: ReturnType<typeof loadConfig>): MemoryPluginStatus {
   const pluginsEnabled = cfg.plugins?.enabled !== false;
   if (!pluginsEnabled) {
     return { enabled: false, slot: null, reason: "plugins disabled" };
@@ -73,10 +72,10 @@ function resolveMemoryPluginStatus(cfg: OpenClawConfig): MemoryPluginStatus {
 }
 
 async function resolveGatewayProbeSnapshot(params: {
-  cfg: OpenClawConfig;
+  cfg: ReturnType<typeof loadConfig>;
   opts: { timeoutMs?: number; all?: boolean };
 }): Promise<GatewayProbeSnapshot> {
-  const gatewayConnection = buildGatewayConnectionDetails({ config: params.cfg });
+  const gatewayConnection = buildGatewayConnectionDetails();
   const isRemoteMode = params.cfg.gateway?.mode === "remote";
   const remoteUrlRaw =
     typeof params.cfg.gateway?.remote?.url === "string" ? params.cfg.gateway.remote.url : "";
@@ -108,7 +107,6 @@ async function resolveGatewayProbeSnapshot(params: {
 }
 
 async function resolveChannelsStatus(params: {
-  cfg: OpenClawConfig;
   gatewayReachable: boolean;
   opts: { timeoutMs?: number; all?: boolean };
 }) {
@@ -116,7 +114,6 @@ async function resolveChannelsStatus(params: {
     return null;
   }
   return await callGateway({
-    config: params.cfg,
     method: "channels.status",
     params: {
       probe: false,
@@ -127,8 +124,8 @@ async function resolveChannelsStatus(params: {
 }
 
 export type StatusScanResult = {
-  cfg: OpenClawConfig;
-  sourceConfig: OpenClawConfig;
+  cfg: ReturnType<typeof loadConfig>;
+  sourceConfig: ReturnType<typeof loadConfig>;
   secretDiagnostics: string[];
   osSummary: ReturnType<typeof resolveOsSummary>;
   tailscaleMode: string;
@@ -155,7 +152,7 @@ export type StatusScanResult = {
 };
 
 async function resolveMemoryStatusSnapshot(params: {
-  cfg: OpenClawConfig;
+  cfg: ReturnType<typeof loadConfig>;
   agentStatus: Awaited<ReturnType<typeof getAgentLocalStatuses>>;
   memoryPlugin: MemoryPluginStatus;
 }): Promise<MemoryStatusSnapshot | null> {
@@ -183,7 +180,7 @@ async function scanStatusJsonFast(opts: {
   timeoutMs?: number;
   all?: boolean;
 }): Promise<StatusScanResult> {
-  const loadedRaw = await readBestEffortConfig();
+  const loadedRaw = loadConfig();
   const { resolvedConfig: cfg, diagnostics: secretDiagnostics } =
     await resolveCommandSecretRefsViaGateway({
       config: loadedRaw,
@@ -199,7 +196,7 @@ async function scanStatusJsonFast(opts: {
     fetchGit: true,
     includeRegistry: true,
   });
-  const agentStatusPromise = getAgentLocalStatuses(cfg);
+  const agentStatusPromise = getAgentLocalStatuses();
   const summaryPromise = getStatusSummary({ config: cfg, sourceConfig: loadedRaw });
 
   const tailscaleDnsPromise =
@@ -235,7 +232,7 @@ async function scanStatusJsonFast(opts: {
   const gatewaySelf = gatewayProbe?.presence
     ? pickGatewaySelfPresence(gatewayProbe.presence)
     : null;
-  const channelsStatusPromise = resolveChannelsStatus({ cfg, gatewayReachable, opts });
+  const channelsStatusPromise = resolveChannelsStatus({ gatewayReachable, opts });
   const memoryPlugin = resolveMemoryPluginStatus(cfg);
   const memoryPromise = resolveMemoryStatusSnapshot({ cfg, agentStatus, memoryPlugin });
   const [channelsStatus, memory] = await Promise.all([channelsStatusPromise, memoryPromise]);
@@ -286,7 +283,7 @@ export async function scanStatus(
     },
     async (progress) => {
       progress.setLabel("Loading config…");
-      const loadedRaw = await readBestEffortConfig();
+      const loadedRaw = loadConfig();
       const { resolvedConfig: cfg, diagnostics: secretDiagnostics } =
         await resolveCommandSecretRefsViaGateway({
           config: loadedRaw,
@@ -310,7 +307,7 @@ export async function scanStatus(
           includeRegistry: true,
         }),
       );
-      const agentStatusPromise = deferResult(getAgentLocalStatuses(cfg));
+      const agentStatusPromise = deferResult(getAgentLocalStatuses());
       const summaryPromise = deferResult(
         getStatusSummary({ config: cfg, sourceConfig: loadedRaw }),
       );
@@ -348,7 +345,7 @@ export async function scanStatus(
       progress.tick();
 
       progress.setLabel("Querying channel status…");
-      const channelsStatus = await resolveChannelsStatus({ cfg, gatewayReachable, opts });
+      const channelsStatus = await resolveChannelsStatus({ gatewayReachable, opts });
       const channelIssues = channelsStatus ? collectChannelStatusIssues(channelsStatus) : [];
       progress.tick();
 

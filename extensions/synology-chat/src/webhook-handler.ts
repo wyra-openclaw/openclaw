@@ -225,7 +225,6 @@ export interface WebhookHandlerDeps {
     chatType: string;
     sessionKey: string;
     accountId: string;
-    commandAuthorized: boolean;
     /** Chat API user_id for sending replies (may differ from webhook user_id) */
     chatUserId?: string;
   }) => Promise<string | null>;
@@ -365,7 +364,6 @@ export function createWebhookHandler(deps: WebhookHandlerDeps) {
         chatType: "direct",
         sessionKey,
         accountId: account.accountId,
-        commandAuthorized: auth.allowed,
         chatUserId: replyUserId,
       });
 

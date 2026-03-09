@@ -5,7 +5,7 @@ import {
   readRequestBodyWithLimit,
   requestBodyErrorToText,
 } from "openclaw/plugin-sdk/voice-call";
-import { normalizeVoiceCallConfig, type VoiceCallConfig } from "./config.js";
+import type { VoiceCallConfig } from "./config.js";
 import type { CoreConfig } from "./core-bridge.js";
 import type { CallManager } from "./manager.js";
 import type { MediaStreamConfig } from "./media-stream.js";
@@ -23,26 +23,6 @@ type WebhookResponsePayload = {
   body: string;
   headers?: Record<string, string>;
 };
-
-function buildRequestUrl(
-  requestUrl: string | undefined,
-  requestHost: string | undefined,
-  fallbackHost = "localhost",
-): URL {
-  return new URL(requestUrl ?? "/", `http://${requestHost ?? fallbackHost}`);
-}
-
-function normalizeWebhookResponse(parsed: {
-  statusCode?: number;
-  providerResponseHeaders?: Record<string, string>;
-  providerResponseBody?: string;
-}): WebhookResponsePayload {
-  return {
-    statusCode: parsed.statusCode ?? 200,
-    headers: parsed.providerResponseHeaders,
-    body: parsed.providerResponseBody ?? "OK",
-  };
-}
 
 /**
  * HTTP server for receiving voice call webhooks from providers.
@@ -66,13 +46,13 @@ export class VoiceCallWebhookServer {
     provider: VoiceCallProvider,
     coreConfig?: CoreConfig,
   ) {
-    this.config = normalizeVoiceCallConfig(config);
+    this.config = config;
     this.manager = manager;
     this.provider = provider;
     this.coreConfig = coreConfig ?? null;
 
     // Initialize media stream handler if streaming is enabled
-    if (this.config.streaming.enabled) {
+    if (config.streaming?.enabled) {
       this.initializeMediaStreaming();
     }
   }
@@ -88,8 +68,7 @@ export class VoiceCallWebhookServer {
    * Initialize media streaming with OpenAI Realtime STT.
    */
   private initializeMediaStreaming(): void {
-    const streaming = this.config.streaming;
-    const apiKey = streaming.openaiApiKey ?? process.env.OPENAI_API_KEY;
+    const apiKey = this.config.streaming?.openaiApiKey || process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
       console.warn("[voice-call] Streaming enabled but no OpenAI API key found");
@@ -98,17 +77,17 @@ export class VoiceCallWebhookServer {
 
     const sttProvider = new OpenAIRealtimeSTTProvider({
       apiKey,
-      model: streaming.sttModel,
-      silenceDurationMs: streaming.silenceDurationMs,
-      vadThreshold: streaming.vadThreshold,
+      model: this.config.streaming?.sttModel,
+      silenceDurationMs: this.config.streaming?.silenceDurationMs,
+      vadThreshold: this.config.streaming?.vadThreshold,
     });
 
     const streamConfig: MediaStreamConfig = {
       sttProvider,
-      preStartTimeoutMs: streaming.preStartTimeoutMs,
-      maxPendingConnections: streaming.maxPendingConnections,
-      maxPendingConnectionsPerIp: streaming.maxPendingConnectionsPerIp,
-      maxConnections: streaming.maxConnections,
+      preStartTimeoutMs: this.config.streaming?.preStartTimeoutMs,
+      maxPendingConnections: this.config.streaming?.maxPendingConnections,
+      maxPendingConnectionsPerIp: this.config.streaming?.maxPendingConnectionsPerIp,
+      maxConnections: this.config.streaming?.maxConnections,
       shouldAcceptStream: ({ callId, token }) => {
         const call = this.manager.getCallByProviderCallId(callId);
         if (!call) {
@@ -211,7 +190,7 @@ export class VoiceCallWebhookServer {
    */
   async start(): Promise<string> {
     const { port, bind, path: webhookPath } = this.config.serve;
-    const streamPath = this.config.streaming.streamPath;
+    const streamPath = this.config.streaming?.streamPath || "/voice/stream";
 
     // Guard: if a server is already listening, return the existing URL.
     // This prevents EADDRINUSE when start() is called more than once on the
@@ -301,7 +280,8 @@ export class VoiceCallWebhookServer {
 
   private getUpgradePathname(request: http.IncomingMessage): string | null {
     try {
-      return buildRequestUrl(request.url, request.headers.host).pathname;
+      const host = request.headers.host || "localhost";
+      return new URL(request.url || "/", `http://${host}`).pathname;
     } catch {
       return null;
     }
@@ -342,7 +322,7 @@ export class VoiceCallWebhookServer {
     req: http.IncomingMessage,
     webhookPath: string,
   ): Promise<WebhookResponsePayload> {
-    const url = buildRequestUrl(req.url, req.headers.host);
+    const url = new URL(req.url || "/", `http://${req.headers.host}`);
 
     if (url.pathname === "/voice/hold-music") {
       return {
@@ -380,7 +360,7 @@ export class VoiceCallWebhookServer {
     const ctx: WebhookContext = {
       headers: req.headers as Record<string, string | string[] | undefined>,
       rawBody: body,
-      url: url.toString(),
+      url: `http://${req.headers.host}${req.url}`,
       method: "POST",
       query: Object.fromEntries(url.searchParams),
       remoteAddress: req.socket.remoteAddress ?? undefined,
@@ -406,7 +386,11 @@ export class VoiceCallWebhookServer {
       this.processParsedEvents(parsed.events);
     }
 
-    return normalizeWebhookResponse(parsed);
+    return {
+      statusCode: parsed.statusCode || 200,
+      headers: parsed.providerResponseHeaders,
+      body: parsed.providerResponseBody || "OK",
+    };
   }
 
   private processParsedEvents(events: NormalizedEvent[]): void {

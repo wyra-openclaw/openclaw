@@ -40,17 +40,11 @@ export function handleAutoCompactionStart(ctx: EmbeddedPiSubscribeContext) {
 
 export function handleAutoCompactionEnd(
   ctx: EmbeddedPiSubscribeContext,
-  evt: AgentEvent & { willRetry?: unknown; result?: unknown; aborted?: unknown },
+  evt: AgentEvent & { willRetry?: unknown },
 ) {
   ctx.state.compactionInFlight = false;
   const willRetry = Boolean(evt.willRetry);
-  // Increment counter whenever compaction actually produced a result,
-  // regardless of willRetry.  Overflow-triggered compaction sets willRetry=true
-  // (the framework retries the LLM request), but the compaction itself succeeded
-  // and context was trimmed — the counter must reflect that.  (#38905)
-  const hasResult = evt.result != null;
-  const wasAborted = Boolean(evt.aborted);
-  if (hasResult && !wasAborted) {
+  if (!willRetry) {
     ctx.incrementCompactionCount?.();
   }
   if (willRetry) {

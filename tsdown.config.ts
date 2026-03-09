@@ -4,42 +4,6 @@ const env = {
   NODE_ENV: "production",
 };
 
-function buildInputOptions(options: { onLog?: unknown; [key: string]: unknown }) {
-  if (process.env.OPENCLAW_BUILD_VERBOSE === "1") {
-    return undefined;
-  }
-
-  const previousOnLog = typeof options.onLog === "function" ? options.onLog : undefined;
-
-  return {
-    ...options,
-    onLog(
-      level: string,
-      log: { code?: string },
-      defaultHandler: (level: string, log: { code?: string }) => void,
-    ) {
-      if (log.code === "PLUGIN_TIMINGS") {
-        return;
-      }
-      if (typeof previousOnLog === "function") {
-        previousOnLog(level, log, defaultHandler);
-        return;
-      }
-      defaultHandler(level, log);
-    },
-  };
-}
-
-function nodeBuildConfig(config: Record<string, unknown>) {
-  return {
-    ...config,
-    env,
-    fixedExtension: false,
-    platform: "node",
-    inputOptions: buildInputOptions,
-  };
-}
-
 const pluginSdkEntrypoints = [
   "index",
   "core",
@@ -88,20 +52,32 @@ const pluginSdkEntrypoints = [
 ] as const;
 
 export default defineConfig([
-  nodeBuildConfig({
+  {
     entry: "src/index.ts",
-  }),
-  nodeBuildConfig({
+    env,
+    fixedExtension: false,
+    platform: "node",
+  },
+  {
     entry: "src/entry.ts",
-  }),
-  nodeBuildConfig({
+    env,
+    fixedExtension: false,
+    platform: "node",
+  },
+  {
     // Ensure this module is bundled as an entry so legacy CLI shims can resolve its exports.
     entry: "src/cli/daemon-cli.ts",
-  }),
-  nodeBuildConfig({
+    env,
+    fixedExtension: false,
+    platform: "node",
+  },
+  {
     entry: "src/infra/warning-filter.ts",
-  }),
-  nodeBuildConfig({
+    env,
+    fixedExtension: false,
+    platform: "node",
+  },
+  {
     // Keep sync lazy-runtime channel modules as concrete dist files.
     entry: {
       "channels/plugins/agent-tools/whatsapp-login":
@@ -115,17 +91,27 @@ export default defineConfig([
       "line/send": "src/line/send.ts",
       "line/template-messages": "src/line/template-messages.ts",
     },
-  }),
-  ...pluginSdkEntrypoints.map((entry) =>
-    nodeBuildConfig({
-      entry: `src/plugin-sdk/${entry}.ts`,
-      outDir: "dist/plugin-sdk",
-    }),
-  ),
-  nodeBuildConfig({
+    env,
+    fixedExtension: false,
+    platform: "node",
+  },
+  ...pluginSdkEntrypoints.map((entry) => ({
+    entry: `src/plugin-sdk/${entry}.ts`,
+    outDir: "dist/plugin-sdk",
+    env,
+    fixedExtension: false,
+    platform: "node" as const,
+  })),
+  {
     entry: "src/extensionAPI.ts",
-  }),
-  nodeBuildConfig({
+    env,
+    fixedExtension: false,
+    platform: "node",
+  },
+  {
     entry: ["src/hooks/bundled/*/handler.ts", "src/hooks/llm-slug-generator.ts"],
-  }),
+    env,
+    fixedExtension: false,
+    platform: "node",
+  },
 ]);

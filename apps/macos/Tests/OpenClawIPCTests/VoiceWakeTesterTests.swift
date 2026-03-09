@@ -3,7 +3,7 @@ import SwabbleKit
 import Testing
 
 struct VoiceWakeTesterTests {
-    @Test func `match respects gap requirement`() {
+    @Test func matchRespectsGapRequirement() {
         let transcript = "hey claude do thing"
         let segments = makeWakeWordSegments(
             transcript: transcript,
@@ -17,7 +17,7 @@ struct VoiceWakeTesterTests {
         #expect(WakeWordGate.match(transcript: transcript, segments: segments, config: config) == nil)
     }
 
-    @Test func `match returns command after gap`() {
+    @Test func matchReturnsCommandAfterGap() {
         let transcript = "hey claude do thing"
         let segments = makeWakeWordSegments(
             transcript: transcript,

@@ -10,7 +10,6 @@ const { detectChangedScope, listChangedPaths } =
       runMacos: boolean;
       runAndroid: boolean;
       runWindows: boolean;
-      runSkillsPython: boolean;
     };
     listChangedPaths: (base: string, head?: string) => string[];
   };
@@ -33,7 +32,6 @@ describe("detectChangedScope", () => {
       runMacos: true,
       runAndroid: true,
       runWindows: true,
-      runSkillsPython: true,
     });
   });
 
@@ -43,7 +41,6 @@ describe("detectChangedScope", () => {
       runMacos: false,
       runAndroid: false,
       runWindows: false,
-      runSkillsPython: false,
     });
   });
 
@@ -53,7 +50,6 @@ describe("detectChangedScope", () => {
       runMacos: false,
       runAndroid: false,
       runWindows: true,
-      runSkillsPython: false,
     });
   });
 
@@ -63,14 +59,12 @@ describe("detectChangedScope", () => {
       runMacos: true,
       runAndroid: false,
       runWindows: false,
-      runSkillsPython: false,
     });
     expect(detectChangedScope(["apps/shared/OpenClawKit/Sources/Foo.swift"])).toEqual({
       runNode: false,
       runMacos: true,
       runAndroid: true,
       runWindows: false,
-      runSkillsPython: false,
     });
   });
 
@@ -81,7 +75,6 @@ describe("detectChangedScope", () => {
         runMacos: false,
         runAndroid: false,
         runWindows: false,
-        runSkillsPython: false,
       },
     );
   });
@@ -92,7 +85,6 @@ describe("detectChangedScope", () => {
       runMacos: false,
       runAndroid: false,
       runWindows: false,
-      runSkillsPython: false,
     });
 
     expect(detectChangedScope(["assets/icon.png"])).toEqual({
@@ -100,7 +92,6 @@ describe("detectChangedScope", () => {
       runMacos: false,
       runAndroid: false,
       runWindows: false,
-      runSkillsPython: false,
     });
   });
 
@@ -110,17 +101,6 @@ describe("detectChangedScope", () => {
       runMacos: false,
       runAndroid: false,
       runWindows: false,
-      runSkillsPython: false,
-    });
-  });
-
-  it("runs Python skill tests when skills change", () => {
-    expect(detectChangedScope(["skills/openai-image-gen/scripts/test_gen.py"])).toEqual({
-      runNode: true,
-      runMacos: false,
-      runAndroid: false,
-      runWindows: false,
-      runSkillsPython: true,
     });
   });
 

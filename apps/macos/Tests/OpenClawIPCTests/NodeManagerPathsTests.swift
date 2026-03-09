@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import OpenClaw
 
-struct NodeManagerPathsTests {
-    @Test func `fnm node bins prefer newest installed version`() throws {
+@Suite struct NodeManagerPathsTests {
+    @Test func fnmNodeBinsPreferNewestInstalledVersion() throws {
         let home = try makeTempDirForTests()
 
         let v20Bin = home
@@ -18,7 +18,7 @@ struct NodeManagerPathsTests {
         #expect(bins.contains(v20Bin.deletingLastPathComponent().path))
     }
 
-    @Test func `ignores entries without node executable`() throws {
+    @Test func ignoresEntriesWithoutNodeExecutable() throws {
         let home = try makeTempDirForTests()
         let missingNodeBin = home
             .appendingPathComponent(".local/share/fnm/node-versions/v99.0.0/installation/bin")

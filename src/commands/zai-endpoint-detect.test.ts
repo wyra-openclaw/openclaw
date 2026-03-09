@@ -58,7 +58,7 @@ describe("detectZaiEndpoint", () => {
 
     for (const scenario of scenarios) {
       const detected = await detectZaiEndpoint({
-        apiKey: "sk-test", // pragma: allowlist secret
+        apiKey: "sk-test",
         fetchFn: makeFetch(scenario.responses),
       });
 

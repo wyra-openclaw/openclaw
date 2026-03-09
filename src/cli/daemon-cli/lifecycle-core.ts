@@ -1,15 +1,16 @@
 import type { Writable } from "node:stream";
-import { readBestEffortConfig, readConfigFileSnapshot } from "../../config/config.js";
-import { formatConfigIssueLines } from "../../config/issue-format.js";
+import { loadConfig } from "../../config/config.js";
 import { resolveIsNixMode } from "../../config/paths.js";
 import { checkTokenDrift } from "../../daemon/service-audit.js";
 import type { GatewayService } from "../../daemon/service.js";
 import { renderSystemdUnavailableHints } from "../../daemon/systemd-hints.js";
 import { isSystemdUserServiceAvailable } from "../../daemon/systemd.js";
-import { isGatewaySecretRefUnavailableError } from "../../gateway/credentials.js";
+import {
+  isGatewaySecretRefUnavailableError,
+  resolveGatewayCredentialsFromConfig,
+} from "../../gateway/credentials.js";
 import { isWSL } from "../../infra/wsl.js";
 import { defaultRuntime } from "../../runtime.js";
-import { resolveGatewayTokenForDriftCheck } from "./gateway-token-drift.js";
 import {
   buildDaemonServiceSnapshot,
   createNullWriter,
@@ -26,18 +27,6 @@ type RestartPostCheckContext = {
   json: boolean;
   stdout: Writable;
   warnings: string[];
-  fail: (message: string, hints?: string[]) => void;
-};
-
-type NotLoadedActionResult = {
-  result: "stopped" | "restarted";
-  message?: string;
-  warnings?: string[];
-};
-
-type NotLoadedActionContext = {
-  json: boolean;
-  stdout: Writable;
   fail: (message: string, hints?: string[]) => void;
 };
 
@@ -104,29 +93,6 @@ async function resolveServiceLoadedOrFail(params: {
     return await params.service.isLoaded({ env: process.env });
   } catch (err) {
     params.fail(`${params.serviceNoun} service check failed: ${String(err)}`);
-    return null;
-  }
-}
-
-/**
- * Best-effort config validation. Returns a string describing the issues if
- * config exists and is invalid, or null if config is valid/missing/unreadable.
- *
- * Note: This reads the config file snapshot in the current CLI environment.
- * Configs using env vars only available in the service context (launchd/systemd)
- * may produce false positives, but the check is intentionally best-effort —
- * a false positive here is safer than a crash on startup. (#35862)
- */
-async function getConfigValidationError(): Promise<string | null> {
-  try {
-    const snapshot = await readConfigFileSnapshot();
-    if (!snapshot.exists || snapshot.valid) {
-      return null;
-    }
-    return snapshot.issues.length > 0
-      ? formatConfigIssueLines(snapshot.issues, "", { normalizeRoot: true }).join("\n")
-      : "Unknown validation issue.";
-  } catch {
     return null;
   }
 }
@@ -211,17 +177,6 @@ export async function runServiceStart(params: {
     });
     return;
   }
-  // Pre-flight config validation (#35862)
-  {
-    const configError = await getConfigValidationError();
-    if (configError) {
-      fail(
-        `${params.serviceNoun} aborted: config is invalid.\n${configError}\nFix the config and retry, or run "openclaw doctor" to repair.`,
-      );
-      return;
-    }
-  }
-
   try {
     await params.service.restart({ env: process.env, stdout });
   } catch (err) {
@@ -247,7 +202,6 @@ export async function runServiceStop(params: {
   serviceNoun: string;
   service: GatewayService;
   opts?: DaemonLifecycleOptions;
-  onNotLoaded?: (ctx: NotLoadedActionContext) => Promise<NotLoadedActionResult | null>;
 }) {
   const json = Boolean(params.opts?.json);
   const { stdout, emit, fail } = createActionIO({ action: "stop", json });
@@ -261,25 +215,6 @@ export async function runServiceStop(params: {
     return;
   }
   if (!loaded) {
-    try {
-      const handled = await params.onNotLoaded?.({ json, stdout, fail });
-      if (handled) {
-        emit({
-          ok: true,
-          result: handled.result,
-          message: handled.message,
-          warnings: handled.warnings,
-          service: buildDaemonServiceSnapshot(params.service, false),
-        });
-        if (!json && handled.message) {
-          defaultRuntime.log(handled.message);
-        }
-        return;
-      }
-    } catch (err) {
-      fail(`${params.serviceNoun} stop failed: ${String(err)}`);
-      return;
-    }
     emit({
       ok: true,
       result: "not-loaded",
@@ -318,12 +253,9 @@ export async function runServiceRestart(params: {
   opts?: DaemonLifecycleOptions;
   checkTokenDrift?: boolean;
   postRestartCheck?: (ctx: RestartPostCheckContext) => Promise<void>;
-  onNotLoaded?: (ctx: NotLoadedActionContext) => Promise<NotLoadedActionResult | null>;
 }): Promise<boolean> {
   const json = Boolean(params.opts?.json);
   const { stdout, emit, fail } = createActionIO({ action: "restart", json });
-  const warnings: string[] = [];
-  let handledNotLoaded: NotLoadedActionResult | null = null;
 
   const loaded = await resolveServiceLoadedOrFail({
     serviceNoun: params.serviceNoun,
@@ -333,49 +265,30 @@ export async function runServiceRestart(params: {
   if (loaded === null) {
     return false;
   }
-
-  // Pre-flight config validation: check before any restart action (including
-  // onNotLoaded which may send SIGUSR1 to an unmanaged process). (#35862)
-  {
-    const configError = await getConfigValidationError();
-    if (configError) {
-      fail(
-        `${params.serviceNoun} aborted: config is invalid.\n${configError}\nFix the config and retry, or run "openclaw doctor" to repair.`,
-      );
-      return false;
-    }
-  }
-
   if (!loaded) {
-    try {
-      handledNotLoaded = (await params.onNotLoaded?.({ json, stdout, fail })) ?? null;
-    } catch (err) {
-      fail(`${params.serviceNoun} restart failed: ${String(err)}`);
-      return false;
-    }
-    if (!handledNotLoaded) {
-      await handleServiceNotLoaded({
-        serviceNoun: params.serviceNoun,
-        service: params.service,
-        loaded,
-        renderStartHints: params.renderStartHints,
-        json,
-        emit,
-      });
-      return false;
-    }
-    if (handledNotLoaded.warnings?.length) {
-      warnings.push(...handledNotLoaded.warnings);
-    }
+    await handleServiceNotLoaded({
+      serviceNoun: params.serviceNoun,
+      service: params.service,
+      loaded,
+      renderStartHints: params.renderStartHints,
+      json,
+      emit,
+    });
+    return false;
   }
 
-  if (loaded && params.checkTokenDrift) {
+  const warnings: string[] = [];
+  if (params.checkTokenDrift) {
     // Check for token drift before restart (service token vs config token)
     try {
       const command = await params.service.readCommand(process.env);
       const serviceToken = command?.environment?.OPENCLAW_GATEWAY_TOKEN;
-      const cfg = await readBestEffortConfig();
-      const configToken = resolveGatewayTokenForDriftCheck({ cfg, env: process.env });
+      const cfg = loadConfig();
+      const configToken = resolveGatewayCredentialsFromConfig({
+        cfg,
+        env: process.env,
+        modeOverride: "local",
+      }).token;
       const driftIssue = checkTokenDrift({ serviceToken, configToken });
       if (driftIssue) {
         const warning = driftIssue.detail
@@ -402,30 +315,22 @@ export async function runServiceRestart(params: {
   }
 
   try {
-    if (loaded) {
-      await params.service.restart({ env: process.env, stdout });
-    }
+    await params.service.restart({ env: process.env, stdout });
     if (params.postRestartCheck) {
       await params.postRestartCheck({ json, stdout, warnings, fail });
     }
-    let restarted = loaded;
-    if (loaded) {
-      try {
-        restarted = await params.service.isLoaded({ env: process.env });
-      } catch {
-        restarted = true;
-      }
+    let restarted = true;
+    try {
+      restarted = await params.service.isLoaded({ env: process.env });
+    } catch {
+      restarted = true;
     }
     emit({
       ok: true,
       result: "restarted",
-      message: handledNotLoaded?.message,
       service: buildDaemonServiceSnapshot(params.service, restarted),
       warnings: warnings.length ? warnings : undefined,
     });
-    if (!json && handledNotLoaded?.message) {
-      defaultRuntime.log(handledNotLoaded.message);
-    }
     return true;
   } catch (err) {
     const hints = params.renderStartHints();

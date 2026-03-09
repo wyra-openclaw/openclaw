@@ -10,7 +10,6 @@ export type InputProvenanceKind = (typeof INPUT_PROVENANCE_KIND_VALUES)[number];
 
 export type InputProvenance = {
   kind: InputProvenanceKind;
-  originSessionId?: string;
   sourceSessionKey?: string;
   sourceChannel?: string;
   sourceTool?: string;
@@ -40,7 +39,6 @@ export function normalizeInputProvenance(value: unknown): InputProvenance | unde
   }
   return {
     kind: record.kind,
-    originSessionId: normalizeOptionalString(record.originSessionId),
     sourceSessionKey: normalizeOptionalString(record.sourceSessionKey),
     sourceChannel: normalizeOptionalString(record.sourceChannel),
     sourceTool: normalizeOptionalString(record.sourceTool),

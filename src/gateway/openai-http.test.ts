@@ -137,19 +137,6 @@ describe("OpenAI-compatible HTTP API (e2e)", () => {
           }
         | undefined;
     const getFirstAgentMessage = () => getFirstAgentCall()?.message ?? "";
-    const expectInvalidRequestNoDispatch = async (messages: unknown[]) => {
-      agentCommand.mockClear();
-      const res = await postChatCompletions(port, {
-        model: "openclaw",
-        messages,
-      });
-      expect(res.status).toBe(400);
-      const json = (await res.json()) as Record<string, unknown>;
-      expect((json.error as Record<string, unknown> | undefined)?.type).toBe(
-        "invalid_request_error",
-      );
-      expect(agentCommand).toHaveBeenCalledTimes(0);
-    };
     const postSyncUserMessage = async (message: string) => {
       const res = await postChatCompletions(port, {
         stream: false,
@@ -321,17 +308,27 @@ describe("OpenAI-compatible HTTP API (e2e)", () => {
       }
 
       {
-        await expectInvalidRequestNoDispatch([
-          {
-            role: "user",
-            content: [
-              {
-                type: "image_url",
-                image_url: { url: "https://example.com/image.png" },
-              },
-            ],
-          },
-        ]);
+        agentCommand.mockClear();
+        const res = await postChatCompletions(port, {
+          model: "openclaw",
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "image_url",
+                  image_url: { url: "https://example.com/image.png" },
+                },
+              ],
+            },
+          ],
+        });
+        expect(res.status).toBe(400);
+        const json = (await res.json()) as Record<string, unknown>;
+        expect((json.error as Record<string, unknown> | undefined)?.type).toBe(
+          "invalid_request_error",
+        );
+        expect(agentCommand).toHaveBeenCalledTimes(0);
       }
 
       {
@@ -426,30 +423,50 @@ describe("OpenAI-compatible HTTP API (e2e)", () => {
       }
 
       {
-        await expectInvalidRequestNoDispatch([
-          {
-            role: "user",
-            content: [
-              {
-                type: "image_url",
-                image_url: { url: "data:application/pdf;base64,QUJDRA==" },
-              },
-            ],
-          },
-        ]);
+        agentCommand.mockClear();
+        const res = await postChatCompletions(port, {
+          model: "openclaw",
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "image_url",
+                  image_url: { url: "data:application/pdf;base64,QUJDRA==" },
+                },
+              ],
+            },
+          ],
+        });
+        expect(res.status).toBe(400);
+        const json = (await res.json()) as Record<string, unknown>;
+        expect((json.error as Record<string, unknown> | undefined)?.type).toBe(
+          "invalid_request_error",
+        );
+        expect(agentCommand).toHaveBeenCalledTimes(0);
       }
 
       {
+        agentCommand.mockClear();
         const manyImageParts = Array.from({ length: 9 }).map(() => ({
           type: "image_url",
           image_url: { url: "data:image/png;base64,QUJDRA==" },
         }));
-        await expectInvalidRequestNoDispatch([
-          {
-            role: "user",
-            content: manyImageParts,
-          },
-        ]);
+        const res = await postChatCompletions(port, {
+          model: "openclaw",
+          messages: [
+            {
+              role: "user",
+              content: manyImageParts,
+            },
+          ],
+        });
+        expect(res.status).toBe(400);
+        const json = (await res.json()) as Record<string, unknown>;
+        expect((json.error as Record<string, unknown> | undefined)?.type).toBe(
+          "invalid_request_error",
+        );
+        expect(agentCommand).toHaveBeenCalledTimes(0);
       }
 
       {

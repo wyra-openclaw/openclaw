@@ -1,6 +1,5 @@
 import type { WebhookRequestBody } from "@line/bot-sdk";
 import type { Request, Response, NextFunction } from "express";
-import { DEFAULT_GROUP_HISTORY_LIMIT, type HistoryEntry } from "../auto-reply/reply/history.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { loadConfig } from "../config/config.js";
 import { logVerbose } from "../globals.js";
@@ -43,7 +42,6 @@ export function createLineBot(opts: LineBotOptions): LineBot {
       logVerbose("line: no message handler configured");
     });
   const replayCache = createLineWebhookReplayCache();
-  const groupHistories = new Map<string, HistoryEntry[]>();
 
   const handleWebhook = async (body: WebhookRequestBody): Promise<void> => {
     if (!body.events || body.events.length === 0) {
@@ -57,8 +55,6 @@ export function createLineBot(opts: LineBotOptions): LineBot {
       mediaMaxBytes,
       processMessage,
       replayCache,
-      groupHistories,
-      historyLimit: cfg.messages?.groupChat?.historyLimit ?? DEFAULT_GROUP_HISTORY_LIMIT,
     });
   };
 

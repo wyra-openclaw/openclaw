@@ -120,7 +120,7 @@ describe("redactConfigSnapshot", () => {
           serviceAccount: {
             type: "service_account",
             client_email: "bot@example.iam.gserviceaccount.com",
-            private_key: "-----BEGIN PRIVATE KEY-----secret-----END PRIVATE KEY-----", // pragma: allowlist secret
+            private_key: "-----BEGIN PRIVATE KEY-----secret-----END PRIVATE KEY-----",
           },
         },
       },
@@ -259,7 +259,7 @@ describe("redactConfigSnapshot", () => {
     const config = {
       gateway: {
         mode: "local",
-        auth: { password: "local" }, // pragma: allowlist secret
+        auth: { password: "local" },
       },
     };
     const snapshot = makeSnapshot(config, JSON.stringify(config));
@@ -299,7 +299,7 @@ describe("redactConfigSnapshot", () => {
 
   it("handles overlap fallback and SecretRef in the same snapshot", () => {
     const config = {
-      gateway: { mode: "default", auth: { password: "default" } }, // pragma: allowlist secret
+      gateway: { mode: "default", auth: { password: "default" } },
       models: {
         providers: {
           default: {
@@ -780,7 +780,7 @@ describe("redactConfigSnapshot", () => {
     };
     const snapshot = makeSnapshot({
       env: {
-        GROQ_API_KEY: "gsk-secret-123", // pragma: allowlist secret
+        GROQ_API_KEY: "gsk-secret-123",
         NODE_ENV: "production",
       },
     });
@@ -803,7 +803,7 @@ describe("redactConfigSnapshot", () => {
         entries: {
           web_search: {
             env: {
-              GEMINI_API_KEY: "gemini-secret-456", // pragma: allowlist secret
+              GEMINI_API_KEY: "gemini-secret-456",
               BRAVE_REGION: "us",
             },
           },
@@ -828,14 +828,14 @@ describe("redactConfigSnapshot", () => {
     const hints = mainSchemaHints;
     const snapshot = makeSnapshot({
       env: {
-        GROQ_API_KEY: "gsk-contract-123", // pragma: allowlist secret
+        GROQ_API_KEY: "gsk-contract-123",
         NODE_ENV: "production",
       },
       skills: {
         entries: {
           web_search: {
             env: {
-              GEMINI_API_KEY: "gemini-contract-456", // pragma: allowlist secret
+              GEMINI_API_KEY: "gemini-contract-456",
               BRAVE_REGION: "us",
             },
           },

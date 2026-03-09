@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
 import { setActivePluginRegistry } from "../plugins/runtime.js";
 import { createOutboundTestPlugin, createTestRegistry } from "../test-utils/channel-plugins.js";
@@ -8,9 +8,23 @@ import { listChatCommands } from "./commands-registry.js";
 import { parseActivationCommand } from "./group-activation.js";
 import { parseSendPolicyCommand } from "./send-policy.js";
 import type { MsgContext } from "./templating.js";
-import { installDiscordRegistryHooks } from "./test-helpers/command-auth-registry-fixture.js";
 
-installDiscordRegistryHooks();
+const createRegistry = () =>
+  createTestRegistry([
+    {
+      pluginId: "discord",
+      plugin: createOutboundTestPlugin({ id: "discord", outbound: { deliveryMode: "direct" } }),
+      source: "test",
+    },
+  ]);
+
+beforeEach(() => {
+  setActivePluginRegistry(createRegistry());
+});
+
+afterEach(() => {
+  setActivePluginRegistry(createRegistry());
+});
 
 describe("resolveCommandAuthorization", () => {
   function resolveWhatsAppAuthorization(params: {

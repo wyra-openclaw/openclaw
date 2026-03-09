@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import type { CronJob } from "../../cron/types.js";
+import { danger } from "../../globals.js";
 import { sanitizeAgentId } from "../../routing/session-key.js";
 import { defaultRuntime } from "../../runtime.js";
 import type { GatewayRpcOpts } from "../gateway-rpc.js";
@@ -7,11 +8,9 @@ import { addGatewayClientOptions, callGatewayFromCli } from "../gateway-rpc.js";
 import { parsePositiveIntOrUndefined } from "../program/helpers.js";
 import {
   getCronChannelOptions,
-  handleCronCliError,
   parseAt,
   parseCronStaggerMs,
   parseDurationMs,
-  printCronJson,
   printCronList,
   warnIfCronSchedulerDisabled,
 } from "./shared.js";
@@ -25,9 +24,10 @@ export function registerCronStatusCommand(cron: Command) {
       .action(async (opts) => {
         try {
           const res = await callGatewayFromCli("cron.status", opts, {});
-          printCronJson(res);
+          defaultRuntime.log(JSON.stringify(res, null, 2));
         } catch (err) {
-          handleCronCliError(err);
+          defaultRuntime.error(danger(String(err)));
+          defaultRuntime.exit(1);
         }
       }),
   );
@@ -46,13 +46,14 @@ export function registerCronListCommand(cron: Command) {
             includeDisabled: Boolean(opts.all),
           });
           if (opts.json) {
-            printCronJson(res);
+            defaultRuntime.log(JSON.stringify(res, null, 2));
             return;
           }
           const jobs = (res as { jobs?: CronJob[] } | null)?.jobs ?? [];
           printCronList(jobs, defaultRuntime);
         } catch (err) {
-          handleCronCliError(err);
+          defaultRuntime.error(danger(String(err)));
+          defaultRuntime.exit(1);
         }
       }),
   );
@@ -272,10 +273,11 @@ export function registerCronAddCommand(cron: Command) {
           };
 
           const res = await callGatewayFromCli("cron.add", opts, params);
-          printCronJson(res);
+          defaultRuntime.log(JSON.stringify(res, null, 2));
           await warnIfCronSchedulerDisabled(opts);
         } catch (err) {
-          handleCronCliError(err);
+          defaultRuntime.error(danger(String(err)));
+          defaultRuntime.exit(1);
         }
       }),
   );

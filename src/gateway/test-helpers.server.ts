@@ -339,46 +339,6 @@ async function startGatewayServerWithRetries(params: {
   throw new Error("failed to start gateway server after retries");
 }
 
-async function waitForWebSocketOpen(ws: WebSocket, timeoutMs = 10_000): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("timeout waiting for ws open")), timeoutMs);
-    const cleanup = () => {
-      clearTimeout(timer);
-      ws.off("open", onOpen);
-      ws.off("error", onError);
-      ws.off("close", onClose);
-    };
-    const onOpen = () => {
-      cleanup();
-      resolve();
-    };
-    const onError = (err: unknown) => {
-      cleanup();
-      reject(err instanceof Error ? err : new Error(String(err)));
-    };
-    const onClose = (code: number, reason: Buffer) => {
-      cleanup();
-      reject(new Error(`closed ${code}: ${reason.toString()}`));
-    };
-    ws.once("open", onOpen);
-    ws.once("error", onError);
-    ws.once("close", onClose);
-  });
-}
-
-async function openTrackedWebSocket(params: {
-  port: number;
-  headers?: Record<string, string>;
-}): Promise<WebSocket> {
-  const ws = new WebSocket(
-    `ws://127.0.0.1:${params.port}`,
-    params.headers ? { headers: params.headers } : undefined,
-  );
-  trackConnectChallengeNonce(ws);
-  await waitForWebSocketOpen(ws);
-  return ws;
-}
-
 export async function withGatewayServer<T>(
   fn: (ctx: { port: number; server: Awaited<ReturnType<typeof startGatewayServer>> }) => Promise<T>,
   opts?: { port?: number; serverOptions?: GatewayServerOptions },
@@ -411,10 +371,33 @@ export async function createGatewaySuiteHarness(opts?: {
     port: started.port,
     server: started.server,
     openWs: async (headers?: Record<string, string>) => {
-      return await openTrackedWebSocket({
-        port: started.port,
-        headers,
+      const ws = new WebSocket(`ws://127.0.0.1:${started.port}`, headers ? { headers } : undefined);
+      trackConnectChallengeNonce(ws);
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("timeout waiting for ws open")), 10_000);
+        const cleanup = () => {
+          clearTimeout(timer);
+          ws.off("open", onOpen);
+          ws.off("error", onError);
+          ws.off("close", onClose);
+        };
+        const onOpen = () => {
+          cleanup();
+          resolve();
+        };
+        const onError = (err: unknown) => {
+          cleanup();
+          reject(err instanceof Error ? err : new Error(String(err)));
+        };
+        const onClose = (code: number, reason: Buffer) => {
+          cleanup();
+          reject(new Error(`closed ${code}: ${reason.toString()}`));
+        };
+        ws.once("open", onOpen);
+        ws.once("error", onError);
+        ws.once("close", onClose);
       });
+      return ws;
     },
     close: async () => {
       await started.server.close();
@@ -448,7 +431,35 @@ export async function startServerWithClient(
   port = started.port;
   const server = started.server;
 
-  const ws = await openTrackedWebSocket({ port, headers: wsHeaders });
+  const ws = new WebSocket(
+    `ws://127.0.0.1:${port}`,
+    wsHeaders ? { headers: wsHeaders } : undefined,
+  );
+  trackConnectChallengeNonce(ws);
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("timeout waiting for ws open")), 10_000);
+    const cleanup = () => {
+      clearTimeout(timer);
+      ws.off("open", onOpen);
+      ws.off("error", onError);
+      ws.off("close", onClose);
+    };
+    const onOpen = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = (err: unknown) => {
+      cleanup();
+      reject(err instanceof Error ? err : new Error(String(err)));
+    };
+    const onClose = (code: number, reason: Buffer) => {
+      cleanup();
+      reject(new Error(`closed ${code}: ${reason.toString()}`));
+    };
+    ws.once("open", onOpen);
+    ws.once("error", onError);
+    ws.once("close", onClose);
+  });
   return { server, ws, port, prevToken: prev, envSnapshot };
 }
 

@@ -1,38 +1,11 @@
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
-import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { withEnv } from "../test-utils/env.js";
-async function importFreshPluginTestModules() {
-  vi.resetModules();
-  vi.unmock("node:fs");
-  vi.unmock("node:fs/promises");
-  vi.unmock("node:module");
-  vi.unmock("./hook-runner-global.js");
-  vi.unmock("./hooks.js");
-  vi.unmock("./loader.js");
-  vi.unmock("jiti");
-  const [loader, hookRunnerGlobal, hooks] = await Promise.all([
-    import("./loader.js"),
-    import("./hook-runner-global.js"),
-    import("./hooks.js"),
-  ]);
-  return {
-    ...loader,
-    ...hookRunnerGlobal,
-    ...hooks,
-  };
-}
-
-const {
-  __testing,
-  createHookRunner,
-  getGlobalHookRunner,
-  loadOpenClawPlugins,
-  resetGlobalHookRunner,
-} = await importFreshPluginTestModules();
+import { getGlobalHookRunner, resetGlobalHookRunner } from "./hook-runner-global.js";
+import { createHookRunner } from "./hooks.js";
+import { __testing, loadOpenClawPlugins } from "./loader.js";
 
 type TempPlugin = { dir: string; file: string; id: string };
 
@@ -758,59 +731,6 @@ describe("loadOpenClawPlugins", () => {
     ).toBe(true);
   });
 
-  it("rejects mixed-auth overlapping http routes", () => {
-    useNoBundledPlugins();
-    const plugin = writePlugin({
-      id: "http-route-overlap",
-      filename: "http-route-overlap.cjs",
-      body: `module.exports = { id: "http-route-overlap", register(api) {
-  api.registerHttpRoute({ path: "/plugin/secure", auth: "gateway", match: "prefix", handler: async () => true });
-  api.registerHttpRoute({ path: "/plugin/secure/report", auth: "plugin", match: "exact", handler: async () => true });
-} };`,
-    });
-
-    const registry = loadRegistryFromSinglePlugin({
-      plugin,
-      pluginConfig: {
-        allow: ["http-route-overlap"],
-      },
-    });
-
-    const routes = registry.httpRoutes.filter((entry) => entry.pluginId === "http-route-overlap");
-    expect(routes).toHaveLength(1);
-    expect(routes[0]?.path).toBe("/plugin/secure");
-    expect(
-      registry.diagnostics.some((diag) =>
-        String(diag.message).includes("http route overlap rejected"),
-      ),
-    ).toBe(true);
-  });
-
-  it("allows same-auth overlapping http routes", () => {
-    useNoBundledPlugins();
-    const plugin = writePlugin({
-      id: "http-route-overlap-same-auth",
-      filename: "http-route-overlap-same-auth.cjs",
-      body: `module.exports = { id: "http-route-overlap-same-auth", register(api) {
-  api.registerHttpRoute({ path: "/plugin/public", auth: "plugin", match: "prefix", handler: async () => true });
-  api.registerHttpRoute({ path: "/plugin/public/report", auth: "plugin", match: "exact", handler: async () => true });
-} };`,
-    });
-
-    const registry = loadRegistryFromSinglePlugin({
-      plugin,
-      pluginConfig: {
-        allow: ["http-route-overlap-same-auth"],
-      },
-    });
-
-    const routes = registry.httpRoutes.filter(
-      (entry) => entry.pluginId === "http-route-overlap-same-auth",
-    );
-    expect(routes).toHaveLength(2);
-    expect(registry.diagnostics).toEqual([]);
-  });
-
   it("respects explicit disable in config", () => {
     process.env.OPENCLAW_BUNDLED_PLUGINS_DIR = "/nonexistent/bundled/plugins";
     const plugin = writePlugin({
@@ -1342,7 +1262,7 @@ describe("loadOpenClawPlugins", () => {
     expect(record?.status).toBe("loaded");
   });
 
-  it("supports legacy plugins importing monolithic plugin-sdk root", async () => {
+  it("supports legacy plugins importing monolithic plugin-sdk root", () => {
     useNoBundledPlugins();
     const plugin = writePlugin({
       id: "legacy-root-import",
@@ -1354,37 +1274,15 @@ describe("loadOpenClawPlugins", () => {
 };`,
     });
 
-    const loaderModuleUrl = pathToFileURL(
-      path.join(process.cwd(), "src", "plugins", "loader.ts"),
-    ).href;
-    const script = `
-      import { loadOpenClawPlugins } from ${JSON.stringify(loaderModuleUrl)};
-      const registry = loadOpenClawPlugins({
-        cache: false,
-        workspaceDir: ${JSON.stringify(plugin.dir)},
-        config: {
-          plugins: {
-            load: { paths: [${JSON.stringify(plugin.file)}] },
-            allow: ["legacy-root-import"],
-          },
-        },
-      });
-      const record = registry.plugins.find((entry) => entry.id === "legacy-root-import");
-      if (!record || record.status !== "loaded") {
-        console.error(record?.error ?? "legacy-root-import missing");
-        process.exit(1);
-      }
-    `;
-
-    execFileSync(process.execPath, ["--import", "tsx", "--input-type=module", "-e", script], {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        OPENCLAW_BUNDLED_PLUGINS_DIR: "/nonexistent/bundled/plugins",
+    const registry = loadRegistryFromSinglePlugin({
+      plugin,
+      pluginConfig: {
+        allow: ["legacy-root-import"],
       },
-      encoding: "utf-8",
-      stdio: "pipe",
     });
+
+    const record = registry.plugins.find((entry) => entry.id === "legacy-root-import");
+    expect(record?.status).toBe("loaded");
   });
 
   it("prefers dist plugin-sdk alias when loader runs from dist", () => {
@@ -1398,59 +1296,10 @@ describe("loadOpenClawPlugins", () => {
     expect(resolved).toBe(distFile);
   });
 
-  it("prefers dist candidates first for production src runtime", () => {
-    const { root, srcFile, distFile } = createPluginSdkAliasFixture();
-
-    const candidates = withEnv({ NODE_ENV: "production", VITEST: undefined }, () =>
-      __testing.listPluginSdkAliasCandidates({
-        srcFile: "index.ts",
-        distFile: "index.js",
-        modulePath: path.join(root, "src", "plugins", "loader.ts"),
-      }),
-    );
-
-    expect(candidates.indexOf(distFile)).toBeLessThan(candidates.indexOf(srcFile));
-  });
-
   it("prefers src plugin-sdk alias when loader runs from src in non-production", () => {
     const { root, srcFile } = createPluginSdkAliasFixture();
 
     const resolved = withEnv({ NODE_ENV: undefined }, () =>
-      __testing.resolvePluginSdkAliasFile({
-        srcFile: "index.ts",
-        distFile: "index.js",
-        modulePath: path.join(root, "src", "plugins", "loader.ts"),
-      }),
-    );
-    expect(resolved).toBe(srcFile);
-  });
-
-  it("prefers src candidates first for non-production src runtime", () => {
-    const { root, srcFile, distFile } = createPluginSdkAliasFixture();
-
-    const candidates = withEnv({ NODE_ENV: undefined }, () =>
-      __testing.listPluginSdkAliasCandidates({
-        srcFile: "index.ts",
-        distFile: "index.js",
-        modulePath: path.join(root, "src", "plugins", "loader.ts"),
-      }),
-    );
-
-    expect(candidates.indexOf(srcFile)).toBeLessThan(candidates.indexOf(distFile));
-  });
-
-  it("derives plugin-sdk subpaths from package exports", () => {
-    const subpaths = __testing.listPluginSdkExportedSubpaths();
-    expect(subpaths).toContain("compat");
-    expect(subpaths).toContain("telegram");
-    expect(subpaths).not.toContain("root-alias");
-  });
-
-  it("falls back to src plugin-sdk alias when dist is missing in production", () => {
-    const { root, srcFile, distFile } = createPluginSdkAliasFixture();
-    fs.rmSync(distFile);
-
-    const resolved = withEnv({ NODE_ENV: "production", VITEST: undefined }, () =>
       __testing.resolvePluginSdkAliasFile({
         srcFile: "index.ts",
         distFile: "index.js",

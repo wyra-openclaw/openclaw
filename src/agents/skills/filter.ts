@@ -1,10 +1,8 @@
-import { normalizeStringEntries } from "../../shared/string-normalization.js";
-
 export function normalizeSkillFilter(skillFilter?: ReadonlyArray<unknown>): string[] | undefined {
   if (skillFilter === undefined) {
     return undefined;
   }
-  return normalizeStringEntries(skillFilter);
+  return skillFilter.map((entry) => String(entry).trim()).filter(Boolean);
 }
 
 export function normalizeSkillFilterForComparison(

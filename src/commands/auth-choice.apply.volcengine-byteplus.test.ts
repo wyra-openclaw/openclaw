@@ -52,7 +52,7 @@ describe("volcengine/byteplus auth choice", () => {
       defaultSelect?: string;
       confirmResult?: boolean;
       textValue?: string;
-      secretInputMode?: "ref"; // pragma: allowlist secret
+      secretInputMode?: "ref";
     },
   ) {
     const agentDir = await setupTempState();

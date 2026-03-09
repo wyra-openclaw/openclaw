@@ -465,7 +465,7 @@ describe("gateway hot reload", () => {
         serverOptions: {
           auth: {
             mode: "password",
-            password: "override-password", // pragma: allowlist secret
+            password: "override-password",
           },
         },
       }),
@@ -486,7 +486,7 @@ describe("gateway hot reload", () => {
 
   it("emits one-shot degraded and recovered system events during secret reload transitions", async () => {
     await writeEnvRefConfig();
-    process.env.OPENAI_API_KEY = "sk-startup"; // pragma: allowlist secret
+    process.env.OPENAI_API_KEY = "sk-startup";
 
     await withGatewayServer(async () => {
       const onHotReload = hoisted.getOnHotReload();
@@ -531,7 +531,7 @@ describe("gateway hot reload", () => {
       );
       expect(drainSystemEvents(sessionKey)).toEqual([]);
 
-      process.env.OPENAI_API_KEY = "sk-recovered"; // pragma: allowlist secret
+      process.env.OPENAI_API_KEY = "sk-recovered";
       await expect(onHotReload?.(plan, nextConfig)).resolves.toBeUndefined();
       const recoveredEvents = drainSystemEvents(sessionKey);
       expect(recoveredEvents.some((event) => event.includes("[SECRETS_RELOADER_RECOVERED]"))).toBe(
@@ -542,7 +542,7 @@ describe("gateway hot reload", () => {
 
   it("serves secrets.reload immediately after startup without race failures", async () => {
     await writeEnvRefConfig();
-    process.env.OPENAI_API_KEY = "sk-startup"; // pragma: allowlist secret
+    process.env.OPENAI_API_KEY = "sk-startup";
     const { server, ws } = await startServerWithClient();
     try {
       await connectOk(ws);

@@ -17,11 +17,7 @@ import {
   setConfigOverride,
   unsetConfigOverride,
 } from "../../config/runtime-overrides.js";
-import {
-  rejectUnauthorizedCommand,
-  requireCommandFlagEnabled,
-  requireGatewayClientScopeForInternalChannel,
-} from "./command-gates.js";
+import { rejectUnauthorizedCommand, requireCommandFlagEnabled } from "./command-gates.js";
 import type { CommandHandler } from "./commands-types.js";
 import { parseConfigCommand } from "./config-commands.js";
 import { parseDebugCommand } from "./debug-commands.js";
@@ -53,14 +49,6 @@ export const handleConfigCommand: CommandHandler = async (params, allowTextComma
   }
 
   if (configCommand.action === "set" || configCommand.action === "unset") {
-    const missingAdminScope = requireGatewayClientScopeForInternalChannel(params, {
-      label: "/config write",
-      allowedScopes: ["operator.admin"],
-      missingText: "❌ /config set|unset requires operator.admin for gateway clients.",
-    });
-    if (missingAdminScope) {
-      return missingAdminScope;
-    }
     const channelId = params.command.channelId ?? normalizeChannelId(params.command.channel);
     const allowWrites = resolveChannelConfigWrites({
       cfg: params.cfg,

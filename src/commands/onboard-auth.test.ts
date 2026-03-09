@@ -420,7 +420,7 @@ describe("applyMinimaxApiConfig", () => {
         providers: {
           anthropic: {
             baseUrl: "https://api.anthropic.com",
-            apiKey: "anthropic-key", // pragma: allowlist secret
+            apiKey: "anthropic-key",
             api: "anthropic-messages",
             models: [
               {

@@ -11,25 +11,6 @@ export type BundledPluginLookup =
   | { kind: "npmSpec"; value: string }
   | { kind: "pluginId"; value: string };
 
-export function findBundledPluginSourceInMap(params: {
-  bundled: ReadonlyMap<string, BundledPluginSource>;
-  lookup: BundledPluginLookup;
-}): BundledPluginSource | undefined {
-  const targetValue = params.lookup.value.trim();
-  if (!targetValue) {
-    return undefined;
-  }
-  if (params.lookup.kind === "pluginId") {
-    return params.bundled.get(targetValue);
-  }
-  for (const source of params.bundled.values()) {
-    if (source.npmSpec === targetValue) {
-      return source;
-    }
-  }
-  return undefined;
-}
-
 export function resolveBundledPluginSources(params: {
   workspaceDir?: string;
 }): Map<string, BundledPluginSource> {
@@ -68,9 +49,18 @@ export function findBundledPluginSource(params: {
   lookup: BundledPluginLookup;
   workspaceDir?: string;
 }): BundledPluginSource | undefined {
+  const targetValue = params.lookup.value.trim();
+  if (!targetValue) {
+    return undefined;
+  }
   const bundled = resolveBundledPluginSources({ workspaceDir: params.workspaceDir });
-  return findBundledPluginSourceInMap({
-    bundled,
-    lookup: params.lookup,
-  });
+  if (params.lookup.kind === "pluginId") {
+    return bundled.get(targetValue);
+  }
+  for (const source of bundled.values()) {
+    if (source.npmSpec === targetValue) {
+      return source;
+    }
+  }
+  return undefined;
 }

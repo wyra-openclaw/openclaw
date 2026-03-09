@@ -1,14 +1,12 @@
 import type { DmPolicy } from "openclaw/plugin-sdk/matrix";
 import {
   addWildcardAllowFrom,
-  buildSingleChannelSecretPromptState,
   formatResolvedUnresolvedNote,
   formatDocsLink,
   hasConfiguredSecretInput,
   mergeAllowFromEntries,
   promptSingleChannelSecretInput,
   promptChannelAccessConfig,
-  setTopLevelChannelGroupPolicy,
   type SecretInput,
   type ChannelOnboardingAdapter,
   type ChannelOnboardingDmPolicy,
@@ -145,12 +143,17 @@ async function promptMatrixAllowFrom(params: {
 }
 
 function setMatrixGroupPolicy(cfg: CoreConfig, groupPolicy: "open" | "allowlist" | "disabled") {
-  return setTopLevelChannelGroupPolicy({
-    cfg,
-    channel: "matrix",
-    groupPolicy,
-    enabled: true,
-  }) as CoreConfig;
+  return {
+    ...cfg,
+    channels: {
+      ...cfg.channels,
+      matrix: {
+        ...cfg.channels?.matrix,
+        enabled: true,
+        groupPolicy,
+      },
+    },
+  };
 }
 
 function setMatrixGroupRooms(cfg: CoreConfig, roomKeys: string[]) {
@@ -324,20 +327,14 @@ export const matrixOnboardingAdapter: ChannelOnboardingAdapter = {
             },
           }),
         ).trim();
-        const passwordPromptState = buildSingleChannelSecretPromptState({
-          accountConfigured: Boolean(existingPasswordConfigured),
-          hasConfigToken: existingPasswordConfigured,
-          allowEnv: true,
-          envValue: envPassword,
-        });
         const passwordResult = await promptSingleChannelSecretInput({
           cfg: next,
           prompter,
           providerHint: "matrix",
           credentialLabel: "password",
-          accountConfigured: passwordPromptState.accountConfigured,
-          canUseEnv: passwordPromptState.canUseEnv,
-          hasConfigToken: passwordPromptState.hasConfigToken,
+          accountConfigured: Boolean(existingPasswordConfigured),
+          canUseEnv: Boolean(envPassword?.trim()) && !existingPasswordConfigured,
+          hasConfigToken: existingPasswordConfigured,
           envPrompt: "MATRIX_PASSWORD detected. Use env var?",
           keepPrompt: "Matrix password already configured. Keep it?",
           inputPrompt: "Matrix password",

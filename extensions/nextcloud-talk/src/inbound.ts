@@ -1,9 +1,9 @@
 import {
   GROUP_POLICY_BLOCKED_LABEL,
   createScopedPairingAccess,
-  dispatchInboundReplyWithBase,
+  createNormalizedOutboundDeliverer,
+  createReplyPrefixOptions,
   formatTextWithAttachmentLinks,
-  issuePairingChallenge,
   logInboundDrop,
   readStoreAllowFromForDmPolicy,
   resolveDmGroupAccessWithCommandGate,
@@ -174,20 +174,26 @@ export async function handleNextcloudTalkInbound(params: {
   } else {
     if (access.decision !== "allow") {
       if (access.decision === "pairing") {
-        await issuePairingChallenge({
-          channel: CHANNEL_ID,
-          senderId,
-          senderIdLine: `Your Nextcloud user id: ${senderId}`,
+        const { code, created } = await pairing.upsertPairingRequest({
+          id: senderId,
           meta: { name: senderName || undefined },
-          upsertPairingRequest: pairing.upsertPairingRequest,
-          sendPairingReply: async (text) => {
-            await sendMessageNextcloudTalk(roomToken, text, { accountId: account.accountId });
-            statusSink?.({ lastOutboundAt: Date.now() });
-          },
-          onReplyError: (err) => {
-            runtime.error?.(`nextcloud-talk: pairing reply failed for ${senderId}: ${String(err)}`);
-          },
         });
+        if (created) {
+          try {
+            await sendMessageNextcloudTalk(
+              roomToken,
+              core.channel.pairing.buildPairingReply({
+                channel: CHANNEL_ID,
+                idLine: `Your Nextcloud user id: ${senderId}`,
+                code,
+              }),
+              { accountId: account.accountId },
+            );
+            statusSink?.({ lastOutboundAt: Date.now() });
+          } catch (err) {
+            runtime.error?.(`nextcloud-talk: pairing reply failed for ${senderId}: ${String(err)}`);
+          }
+        }
       }
       runtime.log?.(`nextcloud-talk: drop DM sender ${senderId} (reason=${access.reason})`);
       return;
@@ -285,30 +291,43 @@ export async function handleNextcloudTalkInbound(params: {
     CommandAuthorized: commandAuthorized,
   });
 
-  await dispatchInboundReplyWithBase({
-    cfg: config as OpenClawConfig,
-    channel: CHANNEL_ID,
-    accountId: account.accountId,
-    route,
+  await core.channel.session.recordInboundSession({
     storePath,
-    ctxPayload,
-    core,
-    deliver: async (payload) => {
-      await deliverNextcloudTalkReply({
-        payload,
-        roomToken,
-        accountId: account.accountId,
-        statusSink,
-      });
-    },
+    sessionKey: ctxPayload.SessionKey ?? route.sessionKey,
+    ctx: ctxPayload,
     onRecordError: (err) => {
       runtime.error?.(`nextcloud-talk: failed updating session meta: ${String(err)}`);
     },
-    onDispatchError: (err, info) => {
-      runtime.error?.(`nextcloud-talk ${info.kind} reply failed: ${String(err)}`);
+  });
+
+  const { onModelSelected, ...prefixOptions } = createReplyPrefixOptions({
+    cfg: config as OpenClawConfig,
+    agentId: route.agentId,
+    channel: CHANNEL_ID,
+    accountId: account.accountId,
+  });
+  const deliverReply = createNormalizedOutboundDeliverer(async (payload) => {
+    await deliverNextcloudTalkReply({
+      payload,
+      roomToken,
+      accountId: account.accountId,
+      statusSink,
+    });
+  });
+
+  await core.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
+    ctx: ctxPayload,
+    cfg: config as OpenClawConfig,
+    dispatcherOptions: {
+      ...prefixOptions,
+      deliver: deliverReply,
+      onError: (err, info) => {
+        runtime.error?.(`nextcloud-talk ${info.kind} reply failed: ${String(err)}`);
+      },
     },
     replyOptions: {
       skillFilter: roomConfig?.skills,
+      onModelSelected,
       disableBlockStreaming:
         typeof account.config.blockStreaming === "boolean"
           ? !account.config.blockStreaming

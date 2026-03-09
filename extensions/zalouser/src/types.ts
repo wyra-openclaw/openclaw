@@ -35,7 +35,6 @@ export type ZaloInboundMessage = {
   senderName?: string;
   groupName?: string;
   content: string;
-  commandContent?: string;
   timestampMs: number;
   msgId?: string;
   cliMsgId?: string;
@@ -93,8 +92,6 @@ type ZalouserSharedConfig = {
   profile?: string;
   dmPolicy?: "pairing" | "allowlist" | "open" | "disabled";
   allowFrom?: Array<string | number>;
-  historyLimit?: number;
-  groupAllowFrom?: Array<string | number>;
   groupPolicy?: "open" | "allowlist" | "disabled";
   groups?: Record<string, ZalouserGroupConfig>;
   messagePrefix?: string;

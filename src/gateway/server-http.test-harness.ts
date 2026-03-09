@@ -28,15 +28,11 @@ export function createRequest(params: {
   path: string;
   authorization?: string;
   method?: string;
-  remoteAddress?: string;
-  host?: string;
 }): IncomingMessage {
   return createGatewayRequest({
     path: params.path,
     authorization: params.authorization,
     method: params.method,
-    remoteAddress: params.remoteAddress,
-    host: params.host,
   });
 }
 
@@ -131,8 +127,6 @@ export async function sendRequest(
     path: string;
     authorization?: string;
     method?: string;
-    remoteAddress?: string;
-    host?: string;
   },
 ): Promise<ReturnType<typeof createResponse>> {
   const response = createResponse();

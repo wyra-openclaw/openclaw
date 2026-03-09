@@ -4,7 +4,6 @@ import {
   createDefaultChannelRuntimeState,
   DEFAULT_ACCOUNT_ID,
   formatPairingApproveHint,
-  mapAllowFromEntries,
   type ChannelPlugin,
 } from "openclaw/plugin-sdk/nostr";
 import type { NostrProfile } from "./config-schema.js";
@@ -57,7 +56,9 @@ export const nostrPlugin: ChannelPlugin<ResolvedNostrAccount> = {
       publicKey: account.publicKey,
     }),
     resolveAllowFrom: ({ cfg, accountId }) =>
-      mapAllowFromEntries(resolveNostrAccount({ cfg, accountId }).config.allowFrom),
+      (resolveNostrAccount({ cfg, accountId }).config.allowFrom ?? []).map((entry) =>
+        String(entry),
+      ),
     formatAllowFrom: ({ allowFrom }) =>
       allowFrom
         .map((entry) => String(entry).trim())

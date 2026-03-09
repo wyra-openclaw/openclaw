@@ -1,5 +1,4 @@
 import type { SsrFPolicy } from "../infra/net/ssrf.js";
-import { normalizeEmbeddingModelWithPrefixes } from "./embeddings-model-normalize.js";
 import { resolveRemoteEmbeddingBearerClient } from "./embeddings-remote-client.js";
 import { fetchRemoteEmbeddingVectors } from "./embeddings-remote-fetch.js";
 import type { EmbeddingProvider, EmbeddingProviderOptions } from "./embeddings.js";
@@ -20,11 +19,14 @@ const VOYAGE_MAX_INPUT_TOKENS: Record<string, number> = {
 };
 
 export function normalizeVoyageModel(model: string): string {
-  return normalizeEmbeddingModelWithPrefixes({
-    model,
-    defaultModel: DEFAULT_VOYAGE_EMBEDDING_MODEL,
-    prefixes: ["voyage/"],
-  });
+  const trimmed = model.trim();
+  if (!trimmed) {
+    return DEFAULT_VOYAGE_EMBEDDING_MODEL;
+  }
+  if (trimmed.startsWith("voyage/")) {
+    return trimmed.slice("voyage/".length);
+  }
+  return trimmed;
 }
 
 export async function createVoyageEmbeddingProvider(

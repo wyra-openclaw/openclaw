@@ -145,10 +145,6 @@ export async function sendMessageDiscord(
     accountId: accountInfo.accountId,
   });
   const chunkMode = resolveChunkMode(cfg, "discord", accountInfo.accountId);
-  const mediaMaxBytes =
-    typeof accountInfo.config.mediaMaxMb === "number"
-      ? accountInfo.config.mediaMaxMb * 1024 * 1024
-      : 8 * 1024 * 1024;
   const textWithTables = convertMarkdownTables(text ?? "", tableMode);
   const textWithMentions = rewriteDiscordKnownMentions(textWithTables, {
     accountId: accountInfo.accountId,
@@ -215,7 +211,6 @@ export async function sendMessageDiscord(
           mediaCaption ?? "",
           opts.mediaUrl,
           opts.mediaLocalRoots,
-          mediaMaxBytes,
           undefined,
           request,
           accountInfo.config.maxLinesPerMessage,
@@ -276,7 +271,6 @@ export async function sendMessageDiscord(
         textWithMentions,
         opts.mediaUrl,
         opts.mediaLocalRoots,
-        mediaMaxBytes,
         opts.replyTo,
         request,
         accountInfo.config.maxLinesPerMessage,

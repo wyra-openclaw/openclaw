@@ -125,7 +125,7 @@ describe("buildGatewayInstallPlan", () => {
       config: {
         env: {
           vars: {
-            GOOGLE_API_KEY: "test-key", // pragma: allowlist secret
+            GOOGLE_API_KEY: "test-key",
           },
           CUSTOM_VAR: "custom-value",
         },

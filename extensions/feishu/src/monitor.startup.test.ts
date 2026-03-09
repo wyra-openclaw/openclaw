@@ -3,11 +3,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { monitorFeishuProvider, stopFeishuMonitor } from "./monitor.js";
 
 const probeFeishuMock = vi.hoisted(() => vi.fn());
-const feishuClientMockModule = vi.hoisted(() => ({
+
+vi.mock("./probe.js", () => ({
+  probeFeishu: probeFeishuMock,
+}));
+
+vi.mock("./client.js", () => ({
   createFeishuWSClient: vi.fn(() => ({ start: vi.fn() })),
   createEventDispatcher: vi.fn(() => ({ register: vi.fn() })),
 }));
-const feishuRuntimeMockModule = vi.hoisted(() => ({
+
+vi.mock("./runtime.js", () => ({
   getFeishuRuntime: () => ({
     channel: {
       debounce: {
@@ -24,13 +30,6 @@ const feishuRuntimeMockModule = vi.hoisted(() => ({
   }),
 }));
 
-vi.mock("./probe.js", () => ({
-  probeFeishu: probeFeishuMock,
-}));
-
-vi.mock("./client.js", () => feishuClientMockModule);
-vi.mock("./runtime.js", () => feishuRuntimeMockModule);
-
 function buildMultiAccountWebsocketConfig(accountIds: string[]): ClawdbotConfig {
   return {
     channels: {
@@ -42,7 +41,7 @@ function buildMultiAccountWebsocketConfig(accountIds: string[]): ClawdbotConfig 
             {
               enabled: true,
               appId: `cli_${accountId}`,
-              appSecret: `secret_${accountId}`, // pragma: allowlist secret
+              appSecret: `secret_${accountId}`,
               connectionMode: "websocket",
             },
           ]),

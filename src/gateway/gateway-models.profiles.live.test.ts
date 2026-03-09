@@ -1013,7 +1013,6 @@ async function runGatewayModelSuite(params: GatewayModelSuiteParams) {
                 shouldRetryExecReadProbe({
                   text: execReadText,
                   nonce: nonceC,
-                  provider: model.provider,
                   attempt: execReadAttempt,
                   maxAttempts: maxExecReadAttempts,
                 })

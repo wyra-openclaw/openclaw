@@ -1,10 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { listAgentIds } from "../../agents/agent-scope.js";
 import type { AgentInternalEvent } from "../../agents/internal-events.js";
-import {
-  normalizeSpawnedRunMetadata,
-  resolveIngressWorkspaceOverrideForSpawnedRun,
-} from "../../agents/spawned-context.js";
 import { buildBareSessionResetPrompt } from "../../auto-reply/reply/session-reset-prompt.js";
 import { agentCommandFromIngress } from "../../commands/agent.js";
 import { loadConfig } from "../../config/config.js";
@@ -169,58 +165,6 @@ async function runSessionResetFromAgent(params: {
   });
 }
 
-function dispatchAgentRunFromGateway(params: {
-  ingressOpts: Parameters<typeof agentCommandFromIngress>[0];
-  runId: string;
-  idempotencyKey: string;
-  respond: GatewayRequestHandlerOptions["respond"];
-  context: GatewayRequestHandlerOptions["context"];
-}) {
-  void agentCommandFromIngress(params.ingressOpts, defaultRuntime, params.context.deps)
-    .then((result) => {
-      const payload = {
-        runId: params.runId,
-        status: "ok" as const,
-        summary: "completed",
-        result,
-      };
-      setGatewayDedupeEntry({
-        dedupe: params.context.dedupe,
-        key: `agent:${params.idempotencyKey}`,
-        entry: {
-          ts: Date.now(),
-          ok: true,
-          payload,
-        },
-      });
-      // Send a second res frame (same id) so TS clients with expectFinal can wait.
-      // Swift clients will typically treat the first res as the result and ignore this.
-      params.respond(true, payload, undefined, { runId: params.runId });
-    })
-    .catch((err) => {
-      const error = errorShape(ErrorCodes.UNAVAILABLE, String(err));
-      const payload = {
-        runId: params.runId,
-        status: "error" as const,
-        summary: String(err),
-      };
-      setGatewayDedupeEntry({
-        dedupe: params.context.dedupe,
-        key: `agent:${params.idempotencyKey}`,
-        entry: {
-          ts: Date.now(),
-          ok: false,
-          payload,
-          error,
-        },
-      });
-      params.respond(false, payload, error, {
-        runId: params.runId,
-        error: formatForLog(err),
-      });
-    });
-}
-
 export const agentHandlers: GatewayRequestHandlers = {
   agent: async ({ params, respond, context, client, isWebchatConnect }) => {
     const p = params;
@@ -267,22 +211,19 @@ export const agentHandlers: GatewayRequestHandlers = {
       label?: string;
       spawnedBy?: string;
       inputProvenance?: InputProvenance;
-      workspaceDir?: string;
     };
     const senderIsOwner = resolveSenderIsOwnerFromClient(client);
     const cfg = loadConfig();
     const idem = request.idempotencyKey;
-    const normalizedSpawned = normalizeSpawnedRunMetadata({
-      spawnedBy: request.spawnedBy,
-      groupId: request.groupId,
-      groupChannel: request.groupChannel,
-      groupSpace: request.groupSpace,
-      workspaceDir: request.workspaceDir,
-    });
-    let resolvedGroupId: string | undefined = normalizedSpawned.groupId;
-    let resolvedGroupChannel: string | undefined = normalizedSpawned.groupChannel;
-    let resolvedGroupSpace: string | undefined = normalizedSpawned.groupSpace;
-    let spawnedByValue = normalizedSpawned.spawnedBy;
+    const groupIdRaw = typeof request.groupId === "string" ? request.groupId.trim() : "";
+    const groupChannelRaw =
+      typeof request.groupChannel === "string" ? request.groupChannel.trim() : "";
+    const groupSpaceRaw = typeof request.groupSpace === "string" ? request.groupSpace.trim() : "";
+    let resolvedGroupId: string | undefined = groupIdRaw || undefined;
+    let resolvedGroupChannel: string | undefined = groupChannelRaw || undefined;
+    let resolvedGroupSpace: string | undefined = groupSpaceRaw || undefined;
+    let spawnedByValue =
+      typeof request.spawnedBy === "string" ? request.spawnedBy.trim() : undefined;
     const inputProvenance = normalizeInputProvenance(request.inputProvenance);
     const cached = context.dedupe.get(`agent:${idem}`);
     if (cached) {
@@ -671,8 +612,8 @@ export const agentHandlers: GatewayRequestHandlers = {
 
     const resolvedThreadId = explicitThreadId ?? deliveryPlan.resolvedThreadId;
 
-    dispatchAgentRunFromGateway({
-      ingressOpts: {
+    void agentCommandFromIngress(
+      {
         message,
         images,
         to: resolvedTo,
@@ -704,18 +645,53 @@ export const agentHandlers: GatewayRequestHandlers = {
         extraSystemPrompt: request.extraSystemPrompt,
         internalEvents: request.internalEvents,
         inputProvenance,
-        // Internal-only: allow workspace override for spawned subagent runs.
-        workspaceDir: resolveIngressWorkspaceOverrideForSpawnedRun({
-          spawnedBy: spawnedByValue,
-          workspaceDir: request.workspaceDir,
-        }),
         senderIsOwner,
       },
-      runId,
-      idempotencyKey: idem,
-      respond,
-      context,
-    });
+      defaultRuntime,
+      context.deps,
+    )
+      .then((result) => {
+        const payload = {
+          runId,
+          status: "ok" as const,
+          summary: "completed",
+          result,
+        };
+        setGatewayDedupeEntry({
+          dedupe: context.dedupe,
+          key: `agent:${idem}`,
+          entry: {
+            ts: Date.now(),
+            ok: true,
+            payload,
+          },
+        });
+        // Send a second res frame (same id) so TS clients with expectFinal can wait.
+        // Swift clients will typically treat the first res as the result and ignore this.
+        respond(true, payload, undefined, { runId });
+      })
+      .catch((err) => {
+        const error = errorShape(ErrorCodes.UNAVAILABLE, String(err));
+        const payload = {
+          runId,
+          status: "error" as const,
+          summary: String(err),
+        };
+        setGatewayDedupeEntry({
+          dedupe: context.dedupe,
+          key: `agent:${idem}`,
+          entry: {
+            ts: Date.now(),
+            ok: false,
+            payload,
+            error,
+          },
+        });
+        respond(false, payload, error, {
+          runId,
+          error: formatForLog(err),
+        });
+      });
   },
   "agent.identity.get": ({ params, respond }) => {
     if (!validateAgentIdentityParams(params)) {

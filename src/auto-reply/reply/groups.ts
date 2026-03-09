@@ -1,11 +1,6 @@
 import { getChannelDock } from "../../channels/dock.js";
-import {
-  getChannelPlugin,
-  normalizeChannelId as normalizePluginChannelId,
-} from "../../channels/plugins/index.js";
-import type { ChannelId } from "../../channels/plugins/types.js";
+import { getChannelPlugin, normalizeChannelId } from "../../channels/plugins/index.js";
 import type { OpenClawConfig } from "../../config/config.js";
-import { resolveChannelGroupRequireMention } from "../../config/group-policy.js";
 import type { GroupKeyResolution, SessionEntry } from "../../config/sessions.js";
 import { isInternalMessageChannel } from "../../utils/message-channel.js";
 import { normalizeGroupActivation } from "../group-activation.js";
@@ -33,25 +28,6 @@ function extractGroupId(raw: string | undefined | null): string | undefined {
   return trimmed;
 }
 
-function resolveDockChannelId(raw?: string | null): ChannelId | null {
-  const normalized = raw?.trim().toLowerCase();
-  if (!normalized) {
-    return null;
-  }
-  try {
-    if (getChannelDock(normalized as ChannelId)) {
-      return normalized as ChannelId;
-    }
-  } catch {
-    // Plugin registry may not be initialized in shared/test contexts.
-  }
-  try {
-    return normalizePluginChannelId(raw) ?? (normalized as ChannelId);
-  } catch {
-    return normalized as ChannelId;
-  }
-}
-
 export function resolveGroupRequireMention(params: {
   cfg: OpenClawConfig;
   ctx: TemplateContext;
@@ -59,34 +35,24 @@ export function resolveGroupRequireMention(params: {
 }): boolean {
   const { cfg, ctx, groupResolution } = params;
   const rawChannel = groupResolution?.channel ?? ctx.Provider?.trim();
-  const channel = resolveDockChannelId(rawChannel);
+  const channel = normalizeChannelId(rawChannel);
   if (!channel) {
     return true;
   }
   const groupId = groupResolution?.id ?? extractGroupId(ctx.From);
   const groupChannel = ctx.GroupChannel?.trim() ?? ctx.GroupSubject?.trim();
   const groupSpace = ctx.GroupSpace?.trim();
-  let requireMention: boolean | undefined;
-  try {
-    requireMention = getChannelDock(channel)?.groups?.resolveRequireMention?.({
-      cfg,
-      groupId,
-      groupChannel,
-      groupSpace,
-      accountId: ctx.AccountId,
-    });
-  } catch {
-    requireMention = undefined;
-  }
+  const requireMention = getChannelDock(channel)?.groups?.resolveRequireMention?.({
+    cfg,
+    groupId,
+    groupChannel,
+    groupSpace,
+    accountId: ctx.AccountId,
+  });
   if (typeof requireMention === "boolean") {
     return requireMention;
   }
-  return resolveChannelGroupRequireMention({
-    cfg,
-    channel,
-    groupId,
-    accountId: ctx.AccountId,
-  });
+  return true;
 }
 
 export function defaultGroupActivation(requireMention: boolean): "always" | "mention" {
@@ -104,7 +70,7 @@ function resolveProviderLabel(rawProvider: string | undefined): string {
   if (isInternalMessageChannel(providerKey)) {
     return "WebChat";
   }
-  const providerId = resolveDockChannelId(rawProvider?.trim());
+  const providerId = normalizeChannelId(rawProvider?.trim());
   if (providerId) {
     return getChannelPlugin(providerId)?.meta.label ?? providerId;
   }
@@ -148,7 +114,7 @@ export function buildGroupIntro(params: {
   const activation =
     normalizeGroupActivation(params.sessionEntry?.groupActivation) ?? params.defaultActivation;
   const rawProvider = params.sessionCtx.Provider?.trim();
-  const providerId = resolveDockChannelId(rawProvider);
+  const providerId = normalizeChannelId(rawProvider);
   const activationLine =
     activation === "always"
       ? "Activation: always-on (you receive every group message)."

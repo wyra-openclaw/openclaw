@@ -349,10 +349,10 @@ async function installPluginFromPackageDir(
     copyErrorPrefix: "failed to copy plugin",
     hasDeps,
     depsLogMessage: "Installing plugin dependencies…",
-    afterCopy: async (installedDir) => {
+    afterCopy: async () => {
       for (const entry of extensions) {
-        const resolvedEntry = path.resolve(installedDir, entry);
-        if (!isPathInside(installedDir, resolvedEntry)) {
+        const resolvedEntry = path.resolve(targetDir, entry);
+        if (!isPathInside(targetDir, resolvedEntry)) {
           logger.warn?.(`extension entry escapes plugin directory: ${entry}`);
           continue;
         }

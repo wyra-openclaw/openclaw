@@ -66,23 +66,6 @@ struct RootCanvas: View {
         return .none
     }
 
-    static func shouldPresentQuickSetup(
-        quickSetupDismissed: Bool,
-        showOnboarding: Bool,
-        hasPresentedSheet: Bool,
-        gatewayConnected: Bool,
-        hasExistingGatewayConfig: Bool,
-        discoveredGatewayCount: Int) -> Bool
-    {
-        guard !quickSetupDismissed else { return false }
-        guard !showOnboarding else { return false }
-        guard !hasPresentedSheet else { return false }
-        guard !gatewayConnected else { return false }
-        // If a gateway target is already configured (manual or last-known), skip quick setup.
-        guard !hasExistingGatewayConfig else { return false }
-        return discoveredGatewayCount > 0
-    }
-
     var body: some View {
         ZStack {
             CanvasContent(
@@ -237,12 +220,7 @@ struct RootCanvas: View {
     }
 
     private func hasExistingGatewayConfig() -> Bool {
-        if self.appModel.activeGatewayConnectConfig != nil { return true }
         if GatewaySettingsStore.loadLastGatewayConnection() != nil { return true }
-
-        let preferredStableID = self.preferredGatewayStableID.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !preferredStableID.isEmpty { return true }
-
         let manualHost = self.manualGatewayHost.trimmingCharacters(in: .whitespacesAndNewlines)
         return self.manualGatewayEnabled && !manualHost.isEmpty
     }
@@ -262,14 +240,11 @@ struct RootCanvas: View {
     }
 
     private func maybeShowQuickSetup() {
-        let shouldPresent = Self.shouldPresentQuickSetup(
-            quickSetupDismissed: self.quickSetupDismissed,
-            showOnboarding: self.showOnboarding,
-            hasPresentedSheet: self.presentedSheet != nil,
-            gatewayConnected: self.appModel.gatewayServerName != nil,
-            hasExistingGatewayConfig: self.hasExistingGatewayConfig(),
-            discoveredGatewayCount: self.gatewayController.gateways.count)
-        guard shouldPresent else { return }
+        guard !self.quickSetupDismissed else { return }
+        guard !self.showOnboarding else { return }
+        guard self.presentedSheet == nil else { return }
+        guard self.appModel.gatewayServerName == nil else { return }
+        guard !self.gatewayController.gateways.isEmpty else { return }
         self.presentedSheet = .quickSetup
     }
 }
@@ -289,65 +264,61 @@ private struct CanvasContent: View {
     var openSettings: () -> Void
 
     private var brightenButtons: Bool { self.systemColorScheme == .light }
-    private var talkActive: Bool { self.appModel.talkMode.isEnabled || self.talkEnabled }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .topTrailing) {
             ScreenTab()
+
+            VStack(spacing: 10) {
+                OverlayButton(systemImage: "text.bubble.fill", brighten: self.brightenButtons) {
+                    self.openChat()
+                }
+                .accessibilityLabel("Chat")
+
+                if self.talkButtonEnabled {
+                    // Talk mode lives on a side bubble so it doesn't get buried in settings.
+                    OverlayButton(
+                        systemImage: self.appModel.talkMode.isEnabled ? "waveform.circle.fill" : "waveform.circle",
+                        brighten: self.brightenButtons,
+                        tint: self.appModel.seamColor,
+                        isActive: self.appModel.talkMode.isEnabled)
+                    {
+                        let next = !self.appModel.talkMode.isEnabled
+                        self.talkEnabled = next
+                        self.appModel.setTalkEnabled(next)
+                    }
+                    .accessibilityLabel("Talk Mode")
+                }
+
+                OverlayButton(systemImage: "gearshape.fill", brighten: self.brightenButtons) {
+                    self.openSettings()
+                }
+                .accessibilityLabel("Settings")
+            }
+            .padding(.top, 10)
+            .padding(.trailing, 10)
         }
         .overlay(alignment: .center) {
-            if self.talkActive {
+            if self.appModel.talkMode.isEnabled {
                 TalkOrbOverlay()
                     .transition(.opacity)
             }
         }
         .overlay(alignment: .topLeading) {
-            HStack(alignment: .top, spacing: 8) {
-                StatusPill(
-                    gateway: self.gatewayStatus,
-                    voiceWakeEnabled: self.voiceWakeEnabled,
-                    activity: self.statusActivity,
-                    brighten: self.brightenButtons,
-                    onTap: {
-                        if self.gatewayStatus == .connected {
-                            self.showGatewayActions = true
-                        } else {
-                            self.openSettings()
-                        }
-                    })
-                    .layoutPriority(1)
-
-                Spacer(minLength: 8)
-
-                HStack(spacing: 8) {
-                    OverlayButton(systemImage: "text.bubble.fill", brighten: self.brightenButtons) {
-                        self.openChat()
-                    }
-                    .accessibilityLabel("Chat")
-
-                    if self.talkButtonEnabled {
-                        // Keep Talk mode near status controls while freeing right-side screen real estate.
-                        OverlayButton(
-                            systemImage: self.talkActive ? "waveform.circle.fill" : "waveform.circle",
-                            brighten: self.brightenButtons,
-                            tint: self.appModel.seamColor,
-                            isActive: self.talkActive)
-                        {
-                            let next = !self.talkActive
-                            self.talkEnabled = next
-                            self.appModel.setTalkEnabled(next)
-                        }
-                        .accessibilityLabel("Talk Mode")
-                    }
-
-                    OverlayButton(systemImage: "gearshape.fill", brighten: self.brightenButtons) {
+            StatusPill(
+                gateway: self.gatewayStatus,
+                voiceWakeEnabled: self.voiceWakeEnabled,
+                activity: self.statusActivity,
+                brighten: self.brightenButtons,
+                onTap: {
+                    if self.gatewayStatus == .connected {
+                        self.showGatewayActions = true
+                    } else {
                         self.openSettings()
                     }
-                    .accessibilityLabel("Settings")
-                }
-            }
-            .padding(.horizontal, 10)
-            .safeAreaPadding(.top, 10)
+                })
+                .padding(.leading, 10)
+                .safeAreaPadding(.top, 10)
         }
         .overlay(alignment: .topLeading) {
             if let voiceWakeToastText, !voiceWakeToastText.isEmpty {
@@ -363,12 +334,6 @@ private struct CanvasContent: View {
             isPresented: self.$showGatewayActions,
             onDisconnect: { self.appModel.disconnectGateway() },
             onOpenSettings: { self.openSettings() })
-        .onAppear {
-            // Keep the runtime talk state aligned with persisted toggle state on cold launch.
-            if self.talkEnabled != self.appModel.talkMode.isEnabled {
-                self.appModel.setTalkEnabled(self.talkEnabled)
-            }
-        }
     }
 
     private var statusActivity: StatusPill.Activity? {

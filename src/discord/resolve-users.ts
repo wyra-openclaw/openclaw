@@ -1,10 +1,7 @@
 import { fetchDiscord } from "./api.js";
 import { listGuilds, type DiscordGuildSummary } from "./guilds.js";
-import {
-  buildDiscordUnresolvedResults,
-  filterDiscordGuilds,
-  resolveDiscordAllowlistToken,
-} from "./resolve-allowlist-common.js";
+import { normalizeDiscordSlug } from "./monitor/allow-list.js";
+import { normalizeDiscordToken } from "./token.js";
 
 type DiscordUser = {
   id: string;
@@ -83,9 +80,9 @@ export async function resolveDiscordUserAllowlist(params: {
   entries: string[];
   fetcher?: typeof fetch;
 }): Promise<DiscordUserResolution[]> {
-  const token = resolveDiscordAllowlistToken(params.token);
+  const token = normalizeDiscordToken(params.token, "channels.discord.token");
   if (!token) {
-    return buildDiscordUnresolvedResults(params.entries, (input) => ({
+    return params.entries.map((input) => ({
       input,
       resolved: false,
     }));
@@ -122,11 +119,13 @@ export async function resolveDiscordUserAllowlist(params: {
       continue;
     }
 
+    const guildName = parsed.guildName?.trim();
     const allGuilds = await getGuilds();
-    const guildList = filterDiscordGuilds(allGuilds, {
-      guildId: parsed.guildId,
-      guildName: parsed.guildName?.trim(),
-    });
+    const guildList = parsed.guildId
+      ? allGuilds.filter((g) => g.id === parsed.guildId)
+      : guildName
+        ? allGuilds.filter((g) => g.slug === normalizeDiscordSlug(guildName))
+        : allGuilds;
 
     let best: { member: DiscordMember; guild: DiscordGuildSummary; score: number } | null = null;
     let matches = 0;

@@ -21,11 +21,11 @@ function buildAccount(): ResolvedNextcloudTalkAccount {
     accountId: "default",
     enabled: true,
     baseUrl: "https://nextcloud.example.com",
-    secret: "secret", // pragma: allowlist secret
-    secretSource: "config", // pragma: allowlist secret
+    secret: "secret",
+    secretSource: "config",
     config: {
       baseUrl: "https://nextcloud.example.com",
-      botSecret: "secret", // pragma: allowlist secret
+      botSecret: "secret",
       webhookPath: "/nextcloud-talk-webhook",
       webhookPort: 8788,
     },

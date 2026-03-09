@@ -1,6 +1,14 @@
-import { createPluginRuntimeStore } from "openclaw/plugin-sdk/compat";
 import type { PluginRuntime } from "openclaw/plugin-sdk/imessage";
 
-const { setRuntime: setIMessageRuntime, getRuntime: getIMessageRuntime } =
-  createPluginRuntimeStore<PluginRuntime>("iMessage runtime not initialized");
-export { getIMessageRuntime, setIMessageRuntime };
+let runtime: PluginRuntime | null = null;
+
+export function setIMessageRuntime(next: PluginRuntime) {
+  runtime = next;
+}
+
+export function getIMessageRuntime(): PluginRuntime {
+  if (!runtime) {
+    throw new Error("iMessage runtime not initialized");
+  }
+  return runtime;
+}

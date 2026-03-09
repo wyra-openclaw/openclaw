@@ -72,11 +72,10 @@ describe("runDaemonInstall integration", () => {
     runtimeLogs.length = 0;
     runtimeErrors.length = 0;
     vi.clearAllMocks();
-    // Keep these defined-but-empty so dotenv won't repopulate from local .env.
-    process.env.OPENCLAW_GATEWAY_TOKEN = "";
-    process.env.CLAWDBOT_GATEWAY_TOKEN = "";
-    process.env.OPENCLAW_GATEWAY_PASSWORD = "";
-    process.env.CLAWDBOT_GATEWAY_PASSWORD = "";
+    delete process.env.OPENCLAW_GATEWAY_TOKEN;
+    delete process.env.CLAWDBOT_GATEWAY_TOKEN;
+    delete process.env.OPENCLAW_GATEWAY_PASSWORD;
+    delete process.env.CLAWDBOT_GATEWAY_PASSWORD;
     serviceMock.isLoaded.mockResolvedValue(false);
     await fs.writeFile(configPath, JSON.stringify({}, null, 2));
     clearConfigCache();
@@ -116,7 +115,7 @@ describe("runDaemonInstall integration", () => {
     expect(joined).toContain("MISSING_GATEWAY_TOKEN");
   });
 
-  it("auto-mints token when no source exists without embedding it into service env", async () => {
+  it("auto-mints token when no source exists and persists the same token used for install env", async () => {
     await fs.writeFile(
       configPath,
       JSON.stringify(
@@ -143,6 +142,6 @@ describe("runDaemonInstall integration", () => {
     expect((persistedToken ?? "").length).toBeGreaterThan(0);
 
     const installEnv = serviceMock.install.mock.calls[0]?.[0]?.environment;
-    expect(installEnv?.OPENCLAW_GATEWAY_TOKEN).toBeUndefined();
+    expect(installEnv?.OPENCLAW_GATEWAY_TOKEN).toBe(persistedToken);
   });
 });

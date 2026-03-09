@@ -7,7 +7,7 @@ import Testing
 @Suite(.serialized)
 @MainActor
 struct OnboardingViewSmokeTests {
-    @Test func `onboarding view builds body`() {
+    @Test func onboardingViewBuildsBody() {
         let state = AppState(preview: true)
         let view = OnboardingView(
             state: state,
@@ -16,18 +16,18 @@ struct OnboardingViewSmokeTests {
         _ = view.body
     }
 
-    @Test func `page order omits workspace and identity steps`() {
+    @Test func pageOrderOmitsWorkspaceAndIdentitySteps() {
         let order = OnboardingView.pageOrder(for: .local, showOnboardingChat: false)
         #expect(!order.contains(7))
         #expect(order.contains(3))
     }
 
-    @Test func `page order omits onboarding chat when identity known`() {
+    @Test func pageOrderOmitsOnboardingChatWhenIdentityKnown() {
         let order = OnboardingView.pageOrder(for: .local, showOnboardingChat: false)
         #expect(!order.contains(8))
     }
 
-    @Test func `select remote gateway clears stale ssh target when endpoint unresolved`() async {
+    @Test func selectRemoteGatewayClearsStaleSshTargetWhenEndpointUnresolved() async {
         let override = FileManager().temporaryDirectory
             .appendingPathComponent("openclaw-config-\(UUID().uuidString)")
             .appendingPathComponent("openclaw.json")

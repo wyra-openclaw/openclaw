@@ -20,7 +20,7 @@ private struct SystemRunCommandContractExpected: Decodable {
 }
 
 struct ExecSystemRunCommandValidatorTests {
-    @Test func `matches shared system run command contract fixture`() throws {
+    @Test func matchesSharedSystemRunCommandContractFixture() throws {
         for entry in try Self.loadContractCases() {
             let result = ExecSystemRunCommandValidator.resolve(command: entry.command, rawCommand: entry.rawCommand)
 

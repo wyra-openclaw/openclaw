@@ -27,7 +27,7 @@ import type { TelegramInlineButtons } from "./button-types.js";
 import { splitTelegramCaption } from "./caption.js";
 import { resolveTelegramFetch } from "./fetch.js";
 import { renderTelegramHtmlText } from "./format.js";
-import { isRecoverableTelegramNetworkError, isSafeToRetrySendError } from "./network-errors.js";
+import { isRecoverableTelegramNetworkError } from "./network-errors.js";
 import { makeProxyFetch } from "./proxy.js";
 import { recordSentMessage } from "./sent-message-cache.js";
 import { maybePersistResolvedTelegramTarget } from "./target-writeback.js";
@@ -349,8 +349,6 @@ function createTelegramRequestWithDiag(params: {
   retry?: RetryConfig;
   verbose?: boolean;
   shouldRetry?: (err: unknown) => boolean;
-  /** When true, the shouldRetry predicate is used exclusively without the TELEGRAM_RETRY_RE fallback. */
-  strictShouldRetry?: boolean;
   useApiErrorLogging?: boolean;
 }): TelegramRequestWithDiag {
   const request = createTelegramRetryRunner({
@@ -358,7 +356,6 @@ function createTelegramRequestWithDiag(params: {
     configRetry: params.account.config.retry,
     verbose: params.verbose,
     ...(params.shouldRetry ? { shouldRetry: params.shouldRetry } : {}),
-    ...(params.strictShouldRetry ? { strictShouldRetry: true } : {}),
   });
   const logHttpError = createTelegramHttpLogger(params.cfg);
   return <T>(
@@ -436,24 +433,6 @@ function createRequestWithChatNotFound(params: {
     });
 }
 
-function createTelegramNonIdempotentRequestWithDiag(params: {
-  cfg: ReturnType<typeof loadConfig>;
-  account: ResolvedTelegramAccount;
-  retry?: RetryConfig;
-  verbose?: boolean;
-  useApiErrorLogging?: boolean;
-}): TelegramRequestWithDiag {
-  return createTelegramRequestWithDiag({
-    cfg: params.cfg,
-    account: params.account,
-    retry: params.retry,
-    verbose: params.verbose,
-    useApiErrorLogging: params.useApiErrorLogging,
-    shouldRetry: (err) => isSafeToRetrySendError(err),
-    strictShouldRetry: true,
-  });
-}
-
 export function buildInlineKeyboard(
   buttons?: TelegramSendOpts["buttons"],
 ): InlineKeyboardMarkup | undefined {
@@ -494,9 +473,6 @@ export async function sendMessageTelegram(
     verbose: opts.verbose,
   });
   const mediaUrl = opts.mediaUrl?.trim();
-  const mediaMaxBytes =
-    opts.maxBytes ??
-    (typeof account.config.mediaMaxMb === "number" ? account.config.mediaMaxMb : 100) * 1024 * 1024;
   const replyMarkup = buildInlineKeyboard(opts.buttons);
 
   const threadParams = buildTelegramThreadReplyParams({
@@ -507,11 +483,12 @@ export async function sendMessageTelegram(
     quoteText: opts.quoteText,
   });
   const hasThreadParams = Object.keys(threadParams).length > 0;
-  const requestWithDiag = createTelegramNonIdempotentRequestWithDiag({
+  const requestWithDiag = createTelegramRequestWithDiag({
     cfg,
     account,
     retry: opts.retry,
     verbose: opts.verbose,
+    shouldRetry: (err) => isRecoverableTelegramNetworkError(err, { context: "send" }),
   });
   const requestWithChatNotFound = createRequestWithChatNotFound({
     requestWithDiag,
@@ -586,7 +563,7 @@ export async function sendMessageTelegram(
     const media = await loadWebMedia(
       mediaUrl,
       buildOutboundMediaLoadOptions({
-        maxBytes: mediaMaxBytes,
+        maxBytes: opts.maxBytes,
         mediaLocalRoots: opts.mediaLocalRoots,
       }),
     );
@@ -596,8 +573,7 @@ export async function sendMessageTelegram(
       fileName: media.fileName,
     });
     const isVideoNote = kind === "video" && opts.asVideoNote === true;
-    const fileName =
-      media.fileName ?? (isGif ? "animation.gif" : inferFilename(kind ?? "document")) ?? "file";
+    const fileName = media.fileName ?? (isGif ? "animation.gif" : inferFilename(kind)) ?? "file";
     const file = new InputFile(media.buffer, fileName);
     let caption: string | undefined;
     let followUpText: string | undefined;
@@ -1113,11 +1089,12 @@ export async function sendPollTelegram(
   // Build poll options as simple strings (Grammy accepts string[] or InputPollOption[])
   const pollOptions = normalizedPoll.options;
 
-  const requestWithDiag = createTelegramNonIdempotentRequestWithDiag({
+  const requestWithDiag = createTelegramRequestWithDiag({
     cfg,
     account,
     retry: opts.retry,
     verbose: opts.verbose,
+    shouldRetry: (err) => isRecoverableTelegramNetworkError(err, { context: "send" }),
   });
   const requestWithChatNotFound = createRequestWithChatNotFound({
     requestWithDiag,
@@ -1232,12 +1209,21 @@ export async function createForumTopicTelegram(
     verbose: opts.verbose,
   });
 
-  const requestWithDiag = createTelegramNonIdempotentRequestWithDiag({
-    cfg,
-    account,
+  const request = createTelegramRetryRunner({
     retry: opts.retry,
+    configRetry: account.config.retry,
     verbose: opts.verbose,
+    shouldRetry: (err) => isRecoverableTelegramNetworkError(err, { context: "send" }),
   });
+  const logHttpError = createTelegramHttpLogger(cfg);
+  const requestWithDiag = <T>(fn: () => Promise<T>, label?: string) =>
+    withTelegramApiErrorLogging({
+      operation: label ?? "request",
+      fn: () => request(fn, label),
+    }).catch((err) => {
+      logHttpError(label ?? "request", err);
+      throw err;
+    });
 
   const extra: Record<string, unknown> = {};
   if (opts.iconColor != null) {

@@ -13,11 +13,9 @@ extension VoiceWakeOverlayController {
         self.ensureWindow()
         self.hostingView?.rootView = VoiceWakeOverlayView(controller: self)
         let target = self.targetFrame()
-        let isFirst = !self.model.isVisible
-        if isFirst { self.model.isVisible = true }
         OverlayPanelFactory.present(
             window: self.window,
-            isFirstPresent: isFirst,
+            isVisible: &self.model.isVisible,
             target: target,
             onFirstPresent: {
                 self.logger.log(

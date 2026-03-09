@@ -30,6 +30,7 @@ import { convertMarkdownTables } from "../../markdown/tables.js";
 import { getAgentScopedMediaLocalRoots } from "../../media/local-roots.js";
 import { buildAgentSessionKey } from "../../routing/resolve-route.js";
 import { resolveThreadSessionKeys } from "../../routing/session-key.js";
+import { buildUntrustedChannelMetadata } from "../../security/channel-metadata.js";
 import { stripReasoningTagsFromText } from "../../shared/text/reasoning-tags.js";
 import { truncateUtf16Safe } from "../../utils.js";
 import { chunkDiscordTextWithMode } from "../chunk.js";
@@ -37,9 +38,8 @@ import { resolveDiscordDraftStreamingChunking } from "../draft-chunking.js";
 import { createDiscordDraftStream } from "../draft-stream.js";
 import { reactMessageDiscord, removeReactionDiscord } from "../send.js";
 import { editMessageDiscord } from "../send.messages.js";
-import { normalizeDiscordSlug } from "./allow-list.js";
+import { normalizeDiscordSlug, resolveDiscordOwnerAllowFrom } from "./allow-list.js";
 import { resolveTimestampMs } from "./format.js";
-import { buildDiscordInboundAccessContext } from "./inbound-context.js";
 import type { DiscordMessagePreflightContext } from "./message-handler.preflight.js";
 import {
   buildDiscordMediaPayload,
@@ -212,6 +212,13 @@ export async function processDiscordMessage(ctx: DiscordMessagePreflightContext)
   const forumContextLine = isForumStarter ? `[Forum parent: #${forumParentSlug}]` : null;
   const groupChannel = isGuildMessage && displayChannelSlug ? `#${displayChannelSlug}` : undefined;
   const groupSubject = isDirectMessage ? undefined : groupChannel;
+  const untrustedChannelMetadata = isGuildMessage
+    ? buildUntrustedChannelMetadata({
+        source: "discord",
+        label: "Discord channel topic",
+        entries: [channelInfo?.topic],
+      })
+    : undefined;
   const senderName = sender.isPluralKit
     ? (sender.name ?? author.username)
     : (data.member?.nickname ?? author.globalName ?? author.username);
@@ -219,13 +226,16 @@ export async function processDiscordMessage(ctx: DiscordMessagePreflightContext)
     ? (sender.tag ?? sender.name ?? author.username)
     : author.username;
   const senderTag = sender.tag;
-  const { groupSystemPrompt, ownerAllowFrom, untrustedContext } = buildDiscordInboundAccessContext({
+  const systemPromptParts = [channelConfig?.systemPrompt?.trim() || null].filter(
+    (entry): entry is string => Boolean(entry),
+  );
+  const groupSystemPrompt =
+    systemPromptParts.length > 0 ? systemPromptParts.join("\n\n") : undefined;
+  const ownerAllowFrom = resolveDiscordOwnerAllowFrom({
     channelConfig,
     guildInfo,
     sender: { id: sender.id, name: sender.name, tag: sender.tag },
     allowNameMatching: isDangerousNameMatchingEnabled(discordConfig),
-    isGuild: isGuildMessage,
-    channelTopic: channelInfo?.topic,
   });
   const storePath = resolveStorePath(cfg.session?.store, {
     agentId: route.agentId,
@@ -364,7 +374,7 @@ export async function processDiscordMessage(ctx: DiscordMessagePreflightContext)
     SenderTag: senderTag,
     GroupSubject: groupSubject,
     GroupChannel: groupChannel,
-    UntrustedContext: untrustedContext,
+    UntrustedContext: untrustedChannelMetadata ? [untrustedChannelMetadata] : undefined,
     GroupSystemPrompt: isGuildMessage ? groupSystemPrompt : undefined,
     GroupSpace: isGuildMessage ? (guildInfo?.id ?? guildSlug) || undefined : undefined,
     OwnerAllowFrom: ownerAllowFrom,

@@ -25,21 +25,6 @@ type SlackConfigLike = {
   accounts?: Record<string, SlackAccountLike | undefined>;
 };
 
-function forEachEnabledAccount<T extends { enabled?: unknown }>(
-  accounts: Record<string, T | undefined> | undefined,
-  run: (accountId: string, account: T) => void,
-): void {
-  if (!accounts) {
-    return;
-  }
-  for (const [accountId, account] of Object.entries(accounts)) {
-    if (!account || account.enabled === false) {
-      continue;
-    }
-    run(accountId, account);
-  }
-}
-
 export function validateTelegramWebhookSecretRequirements(
   value: TelegramConfigLike,
   ctx: z.RefinementCtx,
@@ -53,11 +38,20 @@ export function validateTelegramWebhookSecretRequirements(
       path: ["webhookSecret"],
     });
   }
-  forEachEnabledAccount(value.accounts, (accountId, account) => {
+  if (!value.accounts) {
+    return;
+  }
+  for (const [accountId, account] of Object.entries(value.accounts)) {
+    if (!account) {
+      continue;
+    }
+    if (account.enabled === false) {
+      continue;
+    }
     const accountWebhookUrl =
       typeof account.webhookUrl === "string" ? account.webhookUrl.trim() : "";
     if (!accountWebhookUrl) {
-      return;
+      continue;
     }
     const hasAccountSecret = hasConfiguredSecretInput(account.webhookSecret);
     if (!hasAccountSecret && !hasBaseWebhookSecret) {
@@ -68,7 +62,7 @@ export function validateTelegramWebhookSecretRequirements(
         path: ["accounts", accountId, "webhookSecret"],
       });
     }
-  });
+  }
 }
 
 export function validateSlackSigningSecretRequirements(
@@ -83,11 +77,20 @@ export function validateSlackSigningSecretRequirements(
       path: ["signingSecret"],
     });
   }
-  forEachEnabledAccount(value.accounts, (accountId, account) => {
+  if (!value.accounts) {
+    return;
+  }
+  for (const [accountId, account] of Object.entries(value.accounts)) {
+    if (!account) {
+      continue;
+    }
+    if (account.enabled === false) {
+      continue;
+    }
     const accountMode =
       account.mode === "http" || account.mode === "socket" ? account.mode : baseMode;
     if (accountMode !== "http") {
-      return;
+      continue;
     }
     const accountSecret = account.signingSecret ?? value.signingSecret;
     if (!hasConfiguredSecretInput(accountSecret)) {
@@ -98,5 +101,5 @@ export function validateSlackSigningSecretRequirements(
         path: ["accounts", accountId, "signingSecret"],
       });
     }
-  });
+  }
 }

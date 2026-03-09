@@ -1490,7 +1490,7 @@ description: test skill
       channels: {
         feishu: {
           appId: "cli_test",
-          appSecret: "secret_test", // pragma: allowlist secret
+          appSecret: "secret_test",
         },
       },
     };
@@ -1522,7 +1522,7 @@ description: test skill
       channels: {
         feishu: {
           appId: "cli_test",
-          appSecret: "secret_test", // pragma: allowlist secret
+          appSecret: "secret_test",
           tools: { doc: false },
         },
       },
@@ -1966,8 +1966,8 @@ description: test skill
               mode: "http",
               botTokenSource: "config",
               botTokenStatus: "configured_unavailable",
-              signingSecretSource: "config", // pragma: allowlist secret
-              signingSecretStatus: "configured_unavailable", // pragma: allowlist secret
+              signingSecretSource: "config",
+              signingSecretStatus: "configured_unavailable",
               config: channel,
             };
           }
@@ -1978,8 +1978,8 @@ description: test skill
             mode: "http",
             botTokenSource: "config",
             botTokenStatus: "available",
-            signingSecretSource: "config", // pragma: allowlist secret
-            signingSecretStatus: "available", // pragma: allowlist secret
+            signingSecretSource: "config",
+            signingSecretStatus: "available",
             config: channel,
           };
         },
@@ -2042,8 +2042,8 @@ description: test skill
               mode: "http",
               botTokenSource: "config",
               botTokenStatus: "configured_unavailable",
-              signingSecretSource: "config", // pragma: allowlist secret
-              signingSecretStatus: "configured_unavailable", // pragma: allowlist secret
+              signingSecretSource: "config",
+              signingSecretStatus: "configured_unavailable",
               config: channel,
             };
           }
@@ -2054,8 +2054,8 @@ description: test skill
             mode: "http",
             botTokenSource: "config",
             botTokenStatus: "available",
-            signingSecretSource: "config", // pragma: allowlist secret
-            signingSecretStatus: "missing", // pragma: allowlist secret
+            signingSecretSource: "config",
+            signingSecretStatus: "missing",
             config: channel,
           };
         },

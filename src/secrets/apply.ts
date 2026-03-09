@@ -298,8 +298,7 @@ function applyConfigTargetMutations(params: {
     }
 
     const targetPathSegments = resolved.pathSegments;
-    const usesSiblingRef = resolved.entry.secretShape === "sibling_ref"; // pragma: allowlist secret
-    if (usesSiblingRef) {
+    if (resolved.entry.secretShape === "sibling_ref") {
       const previous = getPath(params.nextConfig, targetPathSegments);
       if (isNonEmptyString(previous)) {
         scrubbedValues.add(previous.trim());
@@ -531,8 +530,7 @@ function applyAuthProfileTargetMutation(params: {
     store,
   });
   const targetPathSegments = params.resolved.pathSegments;
-  const usesSiblingRef = params.resolved.entry.secretShape === "sibling_ref"; // pragma: allowlist secret
-  if (usesSiblingRef) {
+  if (params.resolved.entry.secretShape === "sibling_ref") {
     const previous = getPath(store, targetPathSegments);
     if (isNonEmptyString(previous)) {
       params.scrubbedValues.add(previous.trim());

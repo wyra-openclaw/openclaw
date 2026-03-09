@@ -253,12 +253,9 @@ function waitForPortFreeSync(port: number): void {
  *
  * Called before service restart commands to prevent port conflicts.
  */
-export function cleanStaleGatewayProcessesSync(portOverride?: number): number[] {
+export function cleanStaleGatewayProcessesSync(): number[] {
   try {
-    const port =
-      typeof portOverride === "number" && Number.isFinite(portOverride) && portOverride > 0
-        ? Math.floor(portOverride)
-        : resolveGatewayPort(undefined, process.env);
+    const port = resolveGatewayPort(undefined, process.env);
     const stalePids = findGatewayPidsOnPortSync(port);
     if (stalePids.length === 0) {
       return [];

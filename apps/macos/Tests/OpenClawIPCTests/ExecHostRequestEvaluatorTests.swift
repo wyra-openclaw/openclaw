@@ -3,7 +3,7 @@ import Testing
 @testable import OpenClaw
 
 struct ExecHostRequestEvaluatorTests {
-    @Test func `validate request rejects empty command`() {
+    @Test func validateRequestRejectsEmptyCommand() {
         let request = ExecHostRequest(
             command: [],
             rawCommand: nil,
@@ -23,7 +23,7 @@ struct ExecHostRequestEvaluatorTests {
         }
     }
 
-    @Test func `evaluate requires prompt on allowlist miss without decision`() {
+    @Test func evaluateRequiresPromptOnAllowlistMissWithoutDecision() {
         let context = Self.makeContext(security: .allowlist, ask: .onMiss, allowlistSatisfied: false, skillAllow: false)
         let decision = ExecHostRequestEvaluator.evaluate(context: context, approvalDecision: nil)
         switch decision {
@@ -36,7 +36,7 @@ struct ExecHostRequestEvaluatorTests {
         }
     }
 
-    @Test func `evaluate allows allow once decision on allowlist miss`() {
+    @Test func evaluateAllowsAllowOnceDecisionOnAllowlistMiss() {
         let context = Self.makeContext(security: .allowlist, ask: .onMiss, allowlistSatisfied: false, skillAllow: false)
         let decision = ExecHostRequestEvaluator.evaluate(context: context, approvalDecision: .allowOnce)
         switch decision {
@@ -49,7 +49,7 @@ struct ExecHostRequestEvaluatorTests {
         }
     }
 
-    @Test func `evaluate denies on explicit deny decision`() {
+    @Test func evaluateDeniesOnExplicitDenyDecision() {
         let context = Self.makeContext(security: .full, ask: .off, allowlistSatisfied: true, skillAllow: false)
         let decision = ExecHostRequestEvaluator.evaluate(context: context, approvalDecision: .deny)
         switch decision {

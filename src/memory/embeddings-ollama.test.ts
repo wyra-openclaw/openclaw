@@ -44,7 +44,7 @@ describe("embeddings-ollama", () => {
           providers: {
             ollama: {
               baseUrl: "http://127.0.0.1:11434/v1",
-              apiKey: "ollama-\nlocal\r\n", // pragma: allowlist secret
+              apiKey: "ollama-\nlocal\r\n",
               headers: {
                 "X-Provider-Header": "provider",
               },

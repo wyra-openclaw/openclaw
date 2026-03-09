@@ -12,7 +12,7 @@ import { resolveGatewayCredentialsFromConfig } from "./credentials.js";
 const LIVE = isTruthyEnvValue(process.env.LIVE) || isTruthyEnvValue(process.env.OPENCLAW_LIVE_TEST);
 const LIVE_ANDROID_NODE = isTruthyEnvValue(process.env.OPENCLAW_LIVE_ANDROID_NODE);
 const describeLive = LIVE && LIVE_ANDROID_NODE ? describe : describe.skip;
-const SKIPPED_INTERACTIVE_COMMANDS = new Set<string>();
+const SKIPPED_INTERACTIVE_COMMANDS = new Set<string>(["screen.record"]);
 
 type CommandOutcome = "success" | "error";
 
@@ -119,6 +119,15 @@ const COMMAND_PROFILES: Record<string, CommandProfile> = {
     buildParams: () => ({}),
     timeoutMs: 30_000,
     outcome: "success",
+  },
+  "screen.record": {
+    buildParams: () => ({ durationMs: 1500, fps: 8, includeAudio: false }),
+    timeoutMs: 60_000,
+    outcome: "success",
+    onSuccess: (payload) => {
+      const obj = assertObjectPayload("screen.record", payload);
+      expect(readString(obj.base64)).not.toBeNull();
+    },
   },
   "camera.list": {
     buildParams: () => ({}),
@@ -230,6 +239,12 @@ const COMMAND_PROFILES: Record<string, CommandProfile> = {
       const obj = assertObjectPayload("debug.ed25519", payload);
       expect(readString(obj.diagnostics)).not.toBeNull();
     },
+  },
+  "app.update": {
+    buildParams: () => ({}),
+    timeoutMs: 20_000,
+    outcome: "error",
+    allowedErrorCodes: ["INVALID_REQUEST"],
   },
 };
 

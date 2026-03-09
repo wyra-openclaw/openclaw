@@ -23,10 +23,6 @@ vi.mock("openclaw/plugin-sdk/bluebubbles", () => ({
     );
   },
   mergeAllowFromEntries: (_existing: unknown, entries: string[]) => entries,
-  createAccountListHelpers: () => ({
-    listAccountIds: () => ["default"],
-    resolveDefaultAccountId: () => "default",
-  }),
   normalizeSecretInputString: (value: unknown) => {
     if (typeof value !== "string") {
       return undefined;
@@ -37,10 +33,6 @@ vi.mock("openclaw/plugin-sdk/bluebubbles", () => ({
   normalizeAccountId: (value?: string | null) =>
     value && value.trim().length > 0 ? value : "default",
   promptAccountId: vi.fn(),
-  resolveAccountIdForConfigure: async (params: {
-    accountOverride?: string;
-    defaultAccountId: string;
-  }) => params.accountOverride?.trim() || params.defaultAccountId,
 }));
 
 describe("bluebubbles onboarding SecretInput", () => {

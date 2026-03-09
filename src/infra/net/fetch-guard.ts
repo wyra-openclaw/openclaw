@@ -52,21 +52,12 @@ type GuardedFetchPresetOptions = Omit<
 >;
 
 const DEFAULT_MAX_REDIRECTS = 3;
-const CROSS_ORIGIN_REDIRECT_SAFE_HEADERS = new Set([
-  "accept",
-  "accept-encoding",
-  "accept-language",
-  "cache-control",
-  "content-language",
-  "content-type",
-  "if-match",
-  "if-modified-since",
-  "if-none-match",
-  "if-unmodified-since",
-  "pragma",
-  "range",
-  "user-agent",
-]);
+const CROSS_ORIGIN_REDIRECT_SENSITIVE_HEADERS = [
+  "authorization",
+  "proxy-authorization",
+  "cookie",
+  "cookie2",
+];
 
 export function withStrictGuardedFetchMode(params: GuardedFetchPresetOptions): GuardedFetchOptions {
   return { ...params, mode: GUARDED_FETCH_MODE.STRICT };
@@ -92,16 +83,13 @@ function isRedirectStatus(status: number): boolean {
   return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
 }
 
-function retainSafeHeadersForCrossOriginRedirect(init?: RequestInit): RequestInit | undefined {
+function stripSensitiveHeadersForCrossOriginRedirect(init?: RequestInit): RequestInit | undefined {
   if (!init?.headers) {
     return init;
   }
-  const incoming = new Headers(init.headers);
-  const headers = new Headers();
-  for (const [key, value] of incoming.entries()) {
-    if (CROSS_ORIGIN_REDIRECT_SAFE_HEADERS.has(key.toLowerCase())) {
-      headers.set(key, value);
-    }
+  const headers = new Headers(init.headers);
+  for (const header of CROSS_ORIGIN_REDIRECT_SENSITIVE_HEADERS) {
+    headers.delete(header);
   }
   return { ...init, headers };
 }
@@ -226,7 +214,7 @@ export async function fetchWithSsrFGuard(params: GuardedFetchOptions): Promise<G
           throw new Error("Redirect loop detected");
         }
         if (nextParsedUrl.origin !== parsedUrl.origin) {
-          currentInit = retainSafeHeadersForCrossOriginRedirect(currentInit);
+          currentInit = stripSensitiveHeadersForCrossOriginRedirect(currentInit);
         }
         visited.add(nextUrl);
         void response.body?.cancel();

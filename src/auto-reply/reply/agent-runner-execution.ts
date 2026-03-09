@@ -45,7 +45,6 @@ import {
 import { type BlockReplyPipeline } from "./block-reply-pipeline.js";
 import type { FollowupRun } from "./queue.js";
 import { createBlockReplyDeliveryHandler } from "./reply-delivery.js";
-import { createReplyMediaPathNormalizer } from "./reply-media-paths.js";
 import type { TypingSignaler } from "./typing-mode.js";
 
 export type RuntimeFallbackAttempt = {
@@ -107,11 +106,6 @@ export async function runAgentTurnWithFallback(params: {
   const directlySentBlockKeys = new Set<string>();
 
   const runId = params.opts?.runId ?? crypto.randomUUID();
-  const normalizeReplyMediaPaths = createReplyMediaPathNormalizer({
-    cfg: params.followupRun.run.config,
-    sessionKey: params.sessionKey,
-    workspaceDir: params.followupRun.run.workspaceDir,
-  });
   let didNotifyAgentRunStart = false;
   const notifyAgentRunStart = () => {
     if (didNotifyAgentRunStart) {
@@ -317,7 +311,7 @@ export async function runAgentTurnWithFallback(params: {
             model,
             runId,
             authProfile,
-            allowTransientCooldownProbe: runOptions?.allowTransientCooldownProbe,
+            allowRateLimitCooldownProbe: runOptions?.allowRateLimitCooldownProbe,
           });
           return (async () => {
             const result = await runEmbeddedPiAgent({
@@ -408,7 +402,6 @@ export async function runAgentTurnWithFallback(params: {
                       params.sessionCtx.MessageSidFull ?? params.sessionCtx.MessageSid,
                     normalizeStreamingText,
                     applyReplyToMode: params.applyReplyToMode,
-                    normalizeMediaPaths: normalizeReplyMediaPaths,
                     typingSignals: params.typingSignals,
                     blockStreamingEnabled: params.blockStreamingEnabled,
                     blockReplyPipeline,

@@ -33,9 +33,9 @@ function makeSlackHttpSummaryPlugin(): ChannelPlugin {
               botToken: "xoxb-http",
               signingSecret: "",
               botTokenSource: "config",
-              signingSecretSource: "config", // pragma: allowlist secret
+              signingSecretSource: "config",
               botTokenStatus: "available",
-              signingSecretStatus: "configured_unavailable", // pragma: allowlist secret
+              signingSecretStatus: "configured_unavailable",
             }
           : {
               accountId: "primary",

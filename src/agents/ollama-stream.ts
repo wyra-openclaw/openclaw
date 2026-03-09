@@ -9,7 +9,6 @@ import type {
 } from "@mariozechner/pi-ai";
 import { createAssistantMessageEventStream } from "@mariozechner/pi-ai";
 import { createSubsystemLogger } from "../logging/subsystem.js";
-import { isNonSecretApiKeyMarker } from "./model-auth-markers.js";
 import {
   buildAssistantMessage as buildStreamAssistantMessage,
   buildStreamErrorAssistantMessage,
@@ -19,21 +18,6 @@ import {
 const log = createSubsystemLogger("ollama-stream");
 
 export const OLLAMA_NATIVE_BASE_URL = "http://127.0.0.1:11434";
-
-export function resolveOllamaBaseUrlForRun(params: {
-  modelBaseUrl?: string;
-  providerBaseUrl?: string;
-}): string {
-  const providerBaseUrl = params.providerBaseUrl?.trim();
-  if (providerBaseUrl) {
-    return providerBaseUrl;
-  }
-  const modelBaseUrl = params.modelBaseUrl?.trim();
-  if (modelBaseUrl) {
-    return modelBaseUrl;
-  }
-  return OLLAMA_NATIVE_BASE_URL;
-}
 
 // ── Ollama /api/chat request types ──────────────────────────────────────────
 
@@ -201,7 +185,6 @@ interface OllamaChatResponse {
   message: {
     role: "assistant";
     content: string;
-    thinking?: string;
     reasoning?: string;
     tool_calls?: OllamaToolCall[];
   };
@@ -340,10 +323,10 @@ export function buildAssistantMessage(
 ): AssistantMessage {
   const content: (TextContent | ToolCall)[] = [];
 
-  // Ollama-native reasoning models may emit their answer in `thinking` or
-  // `reasoning` with an empty `content`. Fall back so replies are not dropped.
-  const text =
-    response.message.content || response.message.thinking || response.message.reasoning || "";
+  // Qwen 3 (and potentially other reasoning models) may return their final
+  // answer in a `reasoning` field with an empty `content`. Fall back to
+  // `reasoning` so the response isn't silently dropped.
+  const text = response.message.content || response.message.reasoning || "";
   if (text) {
     content.push({ type: "text", text });
   }
@@ -422,15 +405,6 @@ function resolveOllamaChatUrl(baseUrl: string): string {
   return `${apiBase}/api/chat`;
 }
 
-function resolveOllamaModelHeaders(model: {
-  headers?: unknown;
-}): Record<string, string> | undefined {
-  if (!model.headers || typeof model.headers !== "object" || Array.isArray(model.headers)) {
-    return undefined;
-  }
-  return model.headers as Record<string, string>;
-}
-
 export function createOllamaStreamFn(
   baseUrl: string,
   defaultHeaders?: Record<string, string>,
@@ -472,10 +446,7 @@ export function createOllamaStreamFn(
           ...defaultHeaders,
           ...options?.headers,
         };
-        if (
-          options?.apiKey &&
-          (!headers.Authorization || !isNonSecretApiKeyMarker(options.apiKey))
-        ) {
+        if (options?.apiKey) {
           headers.Authorization = `Bearer ${options.apiKey}`;
         }
 
@@ -497,20 +468,15 @@ export function createOllamaStreamFn(
 
         const reader = response.body.getReader();
         let accumulatedContent = "";
-        let fallbackContent = "";
-        let sawContent = false;
         const accumulatedToolCalls: OllamaToolCall[] = [];
         let finalResponse: OllamaChatResponse | undefined;
 
         for await (const chunk of parseNdjsonStream(reader)) {
           if (chunk.message?.content) {
-            sawContent = true;
             accumulatedContent += chunk.message.content;
-          } else if (!sawContent && chunk.message?.thinking) {
-            fallbackContent += chunk.message.thinking;
-          } else if (!sawContent && chunk.message?.reasoning) {
-            // Backward compatibility for older/native variants that still use reasoning.
-            fallbackContent += chunk.message.reasoning;
+          } else if (chunk.message?.reasoning) {
+            // Qwen 3 reasoning mode: content may be empty, output in reasoning
+            accumulatedContent += chunk.message.reasoning;
           }
 
           // Ollama sends tool_calls in intermediate (done:false) chunks,
@@ -529,7 +495,7 @@ export function createOllamaStreamFn(
           throw new Error("Ollama API stream ended without a final response");
         }
 
-        finalResponse.message.content = accumulatedContent || fallbackContent;
+        finalResponse.message.content = accumulatedContent;
         if (accumulatedToolCalls.length > 0) {
           finalResponse.message.tool_calls = accumulatedToolCalls;
         }
@@ -566,18 +532,4 @@ export function createOllamaStreamFn(
     queueMicrotask(() => void run());
     return stream;
   };
-}
-
-export function createConfiguredOllamaStreamFn(params: {
-  model: { baseUrl?: string; headers?: unknown };
-  providerBaseUrl?: string;
-}): StreamFn {
-  const modelBaseUrl = typeof params.model.baseUrl === "string" ? params.model.baseUrl : undefined;
-  return createOllamaStreamFn(
-    resolveOllamaBaseUrlForRun({
-      modelBaseUrl,
-      providerBaseUrl: params.providerBaseUrl,
-    }),
-    resolveOllamaModelHeaders(params.model),
-  );
 }

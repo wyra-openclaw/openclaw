@@ -140,8 +140,6 @@ export type TelegramAccountConfig = {
   webhookHost?: string;
   /** Local webhook listener bind port (default: 8787). */
   webhookPort?: number;
-  /** Path to the self-signed certificate (PEM) to upload to Telegram during webhook registration. */
-  webhookCertPath?: string;
   /** Per-action tool gating (default: true for all). */
   actions?: TelegramActionConfig;
   /** Telegram thread/conversation binding overrides. */

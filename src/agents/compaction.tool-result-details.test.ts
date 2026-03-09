@@ -1,7 +1,6 @@
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import type { AssistantMessage, ToolResultMessage } from "@mariozechner/pi-ai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { makeAgentAssistantMessage } from "./test-helpers/agent-message-fixtures.js";
 
 const piCodingAgentMocks = vi.hoisted(() => ({
   generateSummary: vi.fn(async () => "summary"),
@@ -22,12 +21,23 @@ vi.mock("@mariozechner/pi-coding-agent", async () => {
 import { isOversizedForSummary, summarizeWithFallback } from "./compaction.js";
 
 function makeAssistantToolCall(timestamp: number): AssistantMessage {
-  return makeAgentAssistantMessage({
+  return {
+    role: "assistant",
     content: [{ type: "toolCall", id: "call_1", name: "browser", arguments: { action: "tabs" } }],
+    api: "openai-responses",
+    provider: "openai",
     model: "gpt-5.2",
+    usage: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 0,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    },
     stopReason: "toolUse",
     timestamp,
-  });
+  };
 }
 
 function makeToolResultWithDetails(timestamp: number): ToolResultMessage<{ raw: string }> {
@@ -54,7 +64,7 @@ describe("compaction toolResult details stripping", () => {
       messages,
       // Minimal shape; compaction won't use these fields in our mocked generateSummary.
       model: { id: "mock", name: "mock", contextWindow: 10000, maxTokens: 1000 } as never,
-      apiKey: "test", // pragma: allowlist secret
+      apiKey: "test",
       signal: new AbortController().signal,
       reserveTokens: 100,
       maxChunkTokens: 5000,

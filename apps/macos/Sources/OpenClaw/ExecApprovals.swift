@@ -84,13 +84,13 @@ enum ExecAsk: String, CaseIterable, Codable, Identifiable {
     }
 }
 
-enum ExecApprovalDecision: String, Codable {
+enum ExecApprovalDecision: String, Codable, Sendable {
     case allowOnce = "allow-once"
     case allowAlways = "allow-always"
     case deny
 }
 
-enum ExecAllowlistPatternValidationReason: String, Codable, Equatable {
+enum ExecAllowlistPatternValidationReason: String, Codable, Sendable, Equatable {
     case empty
     case missingPathComponent
 
@@ -104,12 +104,12 @@ enum ExecAllowlistPatternValidationReason: String, Codable, Equatable {
     }
 }
 
-enum ExecAllowlistPatternValidation: Equatable {
+enum ExecAllowlistPatternValidation: Sendable, Equatable {
     case valid(String)
     case invalid(ExecAllowlistPatternValidationReason)
 }
 
-struct ExecAllowlistRejectedEntry: Equatable {
+struct ExecAllowlistRejectedEntry: Sendable, Equatable {
     let id: UUID
     let pattern: String
     let reason: ExecAllowlistPatternValidationReason
@@ -753,7 +753,7 @@ enum ExecApprovalHelpers {
     }
 }
 
-struct ExecEventPayload: Codable {
+struct ExecEventPayload: Codable, Sendable {
     var sessionKey: String
     var runId: String
     var host: String

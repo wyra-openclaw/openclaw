@@ -8,7 +8,7 @@ const hoisted = vi.hoisted(() => ({
   resolveNextcloudTalkAccount: vi.fn(() => ({
     accountId: "default",
     baseUrl: "https://nextcloud.example.com",
-    secret: "secret-value", // pragma: allowlist secret
+    secret: "secret-value",
   })),
   generateNextcloudTalkSignature: vi.fn(() => ({
     random: "r",

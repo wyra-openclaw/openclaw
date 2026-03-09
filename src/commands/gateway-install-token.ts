@@ -4,7 +4,6 @@ import { resolveSecretInputRef } from "../config/types.secrets.js";
 import { shouldRequireGatewayTokenForInstall } from "../gateway/auth-install-policy.js";
 import { hasAmbiguousGatewayAuthModeConfig } from "../gateway/auth-mode-policy.js";
 import { resolveGatewayAuth } from "../gateway/auth.js";
-import { readGatewayTokenEnv } from "../gateway/credentials.js";
 import { secretRefKey } from "../secrets/ref-contract.js";
 import { resolveSecretRefValues } from "../secrets/resolve.js";
 import { randomToken } from "./onboard-helpers.js";
@@ -46,7 +45,8 @@ export async function resolveGatewayInstallToken(
       ? undefined
       : cfg.gateway.auth.token.trim() || undefined;
   const explicitToken = options.explicitToken?.trim() || undefined;
-  const envToken = readGatewayTokenEnv(options.env);
+  const envToken =
+    options.env.OPENCLAW_GATEWAY_TOKEN?.trim() || options.env.CLAWDBOT_GATEWAY_TOKEN?.trim();
 
   if (hasAmbiguousGatewayAuthModeConfig(cfg)) {
     return {

@@ -1,10 +1,9 @@
 import {
+  addWildcardAllowFrom,
   DEFAULT_ACCOUNT_ID,
   formatDocsLink,
+  promptAccountId,
   promptChannelAccessConfig,
-  resolveAccountIdForConfigure,
-  setTopLevelChannelAllowFrom,
-  setTopLevelChannelDmPolicyWithAllowFrom,
   type ChannelOnboardingAdapter,
   type ChannelOnboardingDmPolicy,
   type DmPolicy,
@@ -91,19 +90,32 @@ function updateIrcAccountConfig(
 }
 
 function setIrcDmPolicy(cfg: CoreConfig, dmPolicy: DmPolicy): CoreConfig {
-  return setTopLevelChannelDmPolicyWithAllowFrom({
-    cfg,
-    channel: "irc",
-    dmPolicy,
-  }) as CoreConfig;
+  const allowFrom =
+    dmPolicy === "open" ? addWildcardAllowFrom(cfg.channels?.irc?.allowFrom) : undefined;
+  return {
+    ...cfg,
+    channels: {
+      ...cfg.channels,
+      irc: {
+        ...cfg.channels?.irc,
+        dmPolicy,
+        ...(allowFrom ? { allowFrom } : {}),
+      },
+    },
+  };
 }
 
 function setIrcAllowFrom(cfg: CoreConfig, allowFrom: string[]): CoreConfig {
-  return setTopLevelChannelAllowFrom({
-    cfg,
-    channel: "irc",
-    allowFrom,
-  }) as CoreConfig;
+  return {
+    ...cfg,
+    channels: {
+      ...cfg.channels,
+      irc: {
+        ...cfg.channels?.irc,
+        allowFrom,
+      },
+    },
+  };
 }
 
 function setIrcNickServ(
@@ -296,16 +308,19 @@ export const ircOnboardingAdapter: ChannelOnboardingAdapter = {
     forceAllowFrom,
   }) => {
     let next = cfg as CoreConfig;
+    const ircOverride = accountOverrides.irc?.trim();
     const defaultAccountId = resolveDefaultIrcAccountId(next);
-    const accountId = await resolveAccountIdForConfigure({
-      cfg: next,
-      prompter,
-      label: "IRC",
-      accountOverride: accountOverrides.irc,
-      shouldPromptAccountIds,
-      listAccountIds: listIrcAccountIds,
-      defaultAccountId,
-    });
+    let accountId = ircOverride || defaultAccountId;
+    if (shouldPromptAccountIds && !ircOverride) {
+      accountId = await promptAccountId({
+        cfg: next,
+        prompter,
+        label: "IRC",
+        currentId: accountId,
+        listAccountIds: listIrcAccountIds,
+        defaultAccountId,
+      });
+    }
 
     const resolved = resolveIrcAccount({ cfg: next, accountId });
     const isDefaultAccount = accountId === DEFAULT_ACCOUNT_ID;

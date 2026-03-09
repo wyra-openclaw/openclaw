@@ -145,7 +145,7 @@ describe("configureGatewayForOnboarding", () => {
 
   it("honors secretInputMode=ref for gateway password prompts", async () => {
     const previous = process.env.OPENCLAW_GATEWAY_PASSWORD;
-    process.env.OPENCLAW_GATEWAY_PASSWORD = "gateway-secret"; // pragma: allowlist secret
+    process.env.OPENCLAW_GATEWAY_PASSWORD = "gateway-secret";
     try {
       const prompter = createPrompter({
         selectQueue: ["loopback", "password", "off", "env"],
@@ -159,7 +159,7 @@ describe("configureGatewayForOnboarding", () => {
         nextConfig: {},
         localPort: 18789,
         quickstartGateway: createQuickstartGateway("password"),
-        secretInputMode: "ref", // pragma: allowlist secret
+        secretInputMode: "ref",
         prompter,
         runtime,
       });
@@ -195,7 +195,7 @@ describe("configureGatewayForOnboarding", () => {
         nextConfig: {},
         localPort: 18789,
         quickstartGateway: createQuickstartGateway("token"),
-        secretInputMode: "ref", // pragma: allowlist secret
+        secretInputMode: "ref",
         prompter,
         runtime,
       });

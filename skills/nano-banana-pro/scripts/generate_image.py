@@ -42,33 +42,6 @@ def get_api_key(provided_key: str | None) -> str | None:
     return os.environ.get("GEMINI_API_KEY")
 
 
-def auto_detect_resolution(max_input_dim: int) -> str:
-    """Infer output resolution from the largest input image dimension."""
-    if max_input_dim >= 3000:
-        return "4K"
-    if max_input_dim >= 1500:
-        return "2K"
-    return "1K"
-
-
-def choose_output_resolution(
-    requested_resolution: str | None,
-    max_input_dim: int,
-    has_input_images: bool,
-) -> tuple[str, bool]:
-    """Choose final resolution and whether it was auto-detected.
-
-    Auto-detection is only applied when the user did not pass --resolution.
-    """
-    if requested_resolution is not None:
-        return requested_resolution, False
-
-    if has_input_images and max_input_dim > 0:
-        return auto_detect_resolution(max_input_dim), True
-
-    return "1K", False
-
-
 def main():
     parser = argparse.ArgumentParser(
         description="Generate images using Nano Banana Pro (Gemini 3 Pro Image)"
@@ -93,8 +66,8 @@ def main():
     parser.add_argument(
         "--resolution", "-r",
         choices=["1K", "2K", "4K"],
-        default=None,
-        help="Output resolution: 1K, 2K, or 4K. If omitted with input images, auto-detect from largest image dimension."
+        default="1K",
+        help="Output resolution: 1K (default), 2K, or 4K"
     )
     parser.add_argument(
         "--aspect-ratio", "-a",
@@ -132,12 +105,13 @@ def main():
 
     # Load input images if provided (up to 14 supported by Nano Banana Pro)
     input_images = []
-    max_input_dim = 0
+    output_resolution = args.resolution
     if args.input_images:
         if len(args.input_images) > 14:
             print(f"Error: Too many input images ({len(args.input_images)}). Maximum is 14.", file=sys.stderr)
             sys.exit(1)
 
+        max_input_dim = 0
         for img_path in args.input_images:
             try:
                 with PILImage.open(img_path) as img:
@@ -152,16 +126,15 @@ def main():
                 print(f"Error loading input image '{img_path}': {e}", file=sys.stderr)
                 sys.exit(1)
 
-    output_resolution, auto_detected = choose_output_resolution(
-        requested_resolution=args.resolution,
-        max_input_dim=max_input_dim,
-        has_input_images=bool(input_images),
-    )
-    if auto_detected:
-        print(
-            f"Auto-detected resolution: {output_resolution} "
-            f"(from max input dimension {max_input_dim})"
-        )
+        # Auto-detect resolution from largest input if not explicitly set
+        if args.resolution == "1K" and max_input_dim > 0:  # Default value
+            if max_input_dim >= 3000:
+                output_resolution = "4K"
+            elif max_input_dim >= 1500:
+                output_resolution = "2K"
+            else:
+                output_resolution = "1K"
+            print(f"Auto-detected resolution: {output_resolution} (from max input dimension {max_input_dim})")
 
     # Build contents (images first if editing, prompt only if generating)
     if input_images:
@@ -219,9 +192,8 @@ def main():
         if image_saved:
             full_path = output_path.resolve()
             print(f"\nImage saved: {full_path}")
-            # OpenClaw parses MEDIA: tokens and will attach the file on
-            # supported chat providers. Emit the canonical MEDIA:<path> form.
-            print(f"MEDIA:{full_path}")
+            # OpenClaw parses MEDIA tokens and will attach the file on supported providers.
+            print(f"MEDIA: {full_path}")
         else:
             print("Error: No image was generated in the response.", file=sys.stderr)
             sys.exit(1)

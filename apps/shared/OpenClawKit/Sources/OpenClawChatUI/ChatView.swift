@@ -21,7 +21,6 @@ public struct OpenClawChatView: View {
     private let style: Style
     private let markdownVariant: ChatMarkdownVariant
     private let userAccent: Color?
-    private let showsAssistantTrace: Bool
 
     private enum Layout {
         #if os(macOS)
@@ -50,15 +49,13 @@ public struct OpenClawChatView: View {
         showsSessionSwitcher: Bool = false,
         style: Style = .standard,
         markdownVariant: ChatMarkdownVariant = .standard,
-        userAccent: Color? = nil,
-        showsAssistantTrace: Bool = false)
+        userAccent: Color? = nil)
     {
         self._viewModel = State(initialValue: viewModel)
         self.showsSessionSwitcher = showsSessionSwitcher
         self.style = style
         self.markdownVariant = markdownVariant
         self.userAccent = userAccent
-        self.showsAssistantTrace = showsAssistantTrace
     }
 
     public var body: some View {
@@ -193,8 +190,7 @@ public struct OpenClawChatView: View {
                 message: msg,
                 style: self.style,
                 markdownVariant: self.markdownVariant,
-                userAccent: self.userAccent,
-                showsAssistantTrace: self.showsAssistantTrace)
+                userAccent: self.userAccent)
                 .frame(
                     maxWidth: .infinity,
                     alignment: msg.role.lowercased() == "user" ? .trailing : .leading)
@@ -214,13 +210,8 @@ public struct OpenClawChatView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
 
-        if let text = self.viewModel.streamingAssistantText,
-           AssistantTextParser.hasVisibleContent(in: text, includeThinking: self.showsAssistantTrace)
-        {
-            ChatStreamingAssistantBubble(
-                text: text,
-                markdownVariant: self.markdownVariant,
-                showsAssistantTrace: self.showsAssistantTrace)
+        if let text = self.viewModel.streamingAssistantText, AssistantTextParser.hasVisibleContent(in: text) {
+            ChatStreamingAssistantBubble(text: text, markdownVariant: self.markdownVariant)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -234,7 +225,7 @@ public struct OpenClawChatView: View {
         } else {
             base = self.viewModel.messages
         }
-        return self.mergeToolResults(in: base).filter(self.shouldDisplayMessage(_:))
+        return self.mergeToolResults(in: base)
     }
 
     @ViewBuilder
@@ -296,7 +287,7 @@ public struct OpenClawChatView: View {
             return true
         }
         if let text = self.viewModel.streamingAssistantText,
-           AssistantTextParser.hasVisibleContent(in: text, includeThinking: self.showsAssistantTrace)
+           AssistantTextParser.hasVisibleContent(in: text)
         {
             return true
         }
@@ -311,9 +302,7 @@ public struct OpenClawChatView: View {
 
     private var showsEmptyState: Bool {
         self.viewModel.messages.isEmpty &&
-            !(self.viewModel.streamingAssistantText.map {
-                AssistantTextParser.hasVisibleContent(in: $0, includeThinking: self.showsAssistantTrace)
-            } ?? false) &&
+            !(self.viewModel.streamingAssistantText.map { AssistantTextParser.hasVisibleContent(in: $0) } ?? false) &&
             self.viewModel.pendingRunCount == 0 &&
             self.viewModel.pendingToolCalls.isEmpty
     }
@@ -402,73 +391,14 @@ public struct OpenClawChatView: View {
         return role == "toolresult" || role == "tool_result"
     }
 
-    private func shouldDisplayMessage(_ message: OpenClawChatMessage) -> Bool {
-        if self.hasInlineAttachments(in: message) {
-            return true
-        }
-
-        let primaryText = self.primaryText(in: message)
-        if !primaryText.isEmpty {
-            if message.role.lowercased() == "user" {
-                return true
-            }
-            if AssistantTextParser.hasVisibleContent(in: primaryText, includeThinking: self.showsAssistantTrace) {
-                return true
-            }
-        }
-
-        guard self.showsAssistantTrace else {
-            return false
-        }
-
-        if self.isToolResultMessage(message) {
-            return !primaryText.isEmpty
-        }
-
-        return !self.toolCalls(in: message).isEmpty || !self.inlineToolResults(in: message).isEmpty
-    }
-
-    private func primaryText(in message: OpenClawChatMessage) -> String {
-        let parts = message.content.compactMap { content -> String? in
-            let kind = (content.type ?? "text").lowercased()
-            guard kind == "text" || kind.isEmpty else { return nil }
-            return content.text
-        }
-        return parts.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func hasInlineAttachments(in message: OpenClawChatMessage) -> Bool {
-        message.content.contains { content in
-            switch content.type ?? "text" {
-            case "file", "attachment":
-                true
-            default:
-                false
-            }
-        }
-    }
-
-    private func toolCalls(in message: OpenClawChatMessage) -> [OpenClawChatMessageContent] {
-        message.content.filter { content in
-            let kind = (content.type ?? "").lowercased()
-            if ["toolcall", "tool_call", "tooluse", "tool_use"].contains(kind) {
-                return true
-            }
-            return content.name != nil && content.arguments != nil
-        }
-    }
-
-    private func inlineToolResults(in message: OpenClawChatMessage) -> [OpenClawChatMessageContent] {
-        message.content.filter { content in
-            let kind = (content.type ?? "").lowercased()
-            return kind == "toolresult" || kind == "tool_result"
-        }
-    }
-
     private func toolCallIds(in message: OpenClawChatMessage) -> Set<String> {
         var ids = Set<String>()
-        for content in self.toolCalls(in: message) {
-            if let id = content.id {
+        for content in message.content {
+            let kind = (content.type ?? "").lowercased()
+            let isTool =
+                ["toolcall", "tool_call", "tooluse", "tool_use"].contains(kind) ||
+                (content.name != nil && content.arguments != nil)
+            if isTool, let id = content.id {
                 ids.insert(id)
             }
         }
@@ -479,7 +409,12 @@ public struct OpenClawChatView: View {
     }
 
     private func toolResultText(from message: OpenClawChatMessage) -> String {
-        self.primaryText(in: message)
+        let parts = message.content.compactMap { content -> String? in
+            let kind = (content.type ?? "text").lowercased()
+            guard kind == "text" || kind.isEmpty else { return nil }
+            return content.text
+        }
+        return parts.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func dismissKeyboardIfNeeded() {

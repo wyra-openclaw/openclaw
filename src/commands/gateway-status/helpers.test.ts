@@ -180,7 +180,7 @@ describe("resolveAuthForTarget", () => {
           },
           remote: {
             token: "remote-token",
-            password: "remote-password", // pragma: allowlist secret
+            password: "remote-password",
           },
         },
       },

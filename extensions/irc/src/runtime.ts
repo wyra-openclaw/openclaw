@@ -1,6 +1,14 @@
-import { createPluginRuntimeStore } from "openclaw/plugin-sdk/compat";
 import type { PluginRuntime } from "openclaw/plugin-sdk/irc";
 
-const { setRuntime: setIrcRuntime, getRuntime: getIrcRuntime } =
-  createPluginRuntimeStore<PluginRuntime>("IRC runtime not initialized");
-export { getIrcRuntime, setIrcRuntime };
+let runtime: PluginRuntime | null = null;
+
+export function setIrcRuntime(next: PluginRuntime) {
+  runtime = next;
+}
+
+export function getIrcRuntime(): PluginRuntime {
+  if (!runtime) {
+    throw new Error("IRC runtime not initialized");
+  }
+  return runtime;
+}

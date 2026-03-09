@@ -90,7 +90,7 @@ describe("startBrowserBridgeServer auth", () => {
         if (token !== "valid-token") {
           return null;
         }
-        return { noVncPort: 45678, password: "Abc123xy" }; // pragma: allowlist secret
+        return { noVncPort: 45678, password: "Abc123xy" };
       },
     });
     servers.push({ stop: () => stopBrowserBridgeServer(bridge.server) });

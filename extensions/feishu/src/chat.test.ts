@@ -29,7 +29,7 @@ describe("registerFeishuChatTools", () => {
           feishu: {
             enabled: true,
             appId: "app_id",
-            appSecret: "app_secret", // pragma: allowlist secret
+            appSecret: "app_secret",
             tools: { chat: true },
           },
         },
@@ -76,7 +76,7 @@ describe("registerFeishuChatTools", () => {
           feishu: {
             enabled: true,
             appId: "app_id",
-            appSecret: "app_secret", // pragma: allowlist secret
+            appSecret: "app_secret",
             tools: { chat: false },
           },
         },

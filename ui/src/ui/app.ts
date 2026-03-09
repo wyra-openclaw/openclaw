@@ -146,7 +146,6 @@ export class OpenClawApp extends LitElement {
   @state() chatMessage = "";
   @state() chatMessages: unknown[] = [];
   @state() chatToolMessages: unknown[] = [];
-  @state() chatStreamSegments: Array<{ text: string; ts: number }> = [];
   @state() chatStream: string | null = null;
   @state() chatStreamStartedAt: number | null = null;
   @state() chatRunId: string | null = null;

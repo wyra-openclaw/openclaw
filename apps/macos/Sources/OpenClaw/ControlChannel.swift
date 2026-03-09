@@ -14,7 +14,7 @@ struct ControlHeartbeatEvent: Codable {
     let reason: String?
 }
 
-struct ControlAgentEvent: Codable, Identifiable {
+struct ControlAgentEvent: Codable, Sendable, Identifiable {
     var id: String {
         "\(self.runId)-\(self.seq)"
     }

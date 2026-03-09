@@ -1,5 +1,4 @@
 import {
-  buildOauthProviderAuthResult,
   emptyPluginConfigSchema,
   type OpenClawPluginApi,
   type ProviderAuthContext,
@@ -64,14 +63,22 @@ const qwenPortalPlugin = {
 
               progress.stop("Qwen OAuth complete");
 
+              const profileId = `${PROVIDER_ID}:default`;
               const baseUrl = normalizeBaseUrl(result.resourceUrl);
 
-              return buildOauthProviderAuthResult({
-                providerId: PROVIDER_ID,
-                defaultModel: DEFAULT_MODEL,
-                access: result.access,
-                refresh: result.refresh,
-                expires: result.expires,
+              return {
+                profiles: [
+                  {
+                    profileId,
+                    credential: {
+                      type: "oauth",
+                      provider: PROVIDER_ID,
+                      access: result.access,
+                      refresh: result.refresh,
+                      expires: result.expires,
+                    },
+                  },
+                ],
                 configPatch: {
                   models: {
                     providers: {
@@ -103,11 +110,12 @@ const qwenPortalPlugin = {
                     },
                   },
                 },
+                defaultModel: DEFAULT_MODEL,
                 notes: [
                   "Qwen OAuth tokens auto-refresh. Re-run login if refresh fails or access is revoked.",
                   `Base URL defaults to ${DEFAULT_BASE_URL}. Override models.providers.${PROVIDER_ID}.baseUrl if needed.`,
                 ],
-              });
+              };
             } catch (err) {
               progress.stop("Qwen OAuth failed");
               await ctx.prompter.note(

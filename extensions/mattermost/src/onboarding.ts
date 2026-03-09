@@ -1,6 +1,5 @@
-import { DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk/account-id";
+import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "openclaw/plugin-sdk/account-id";
 import {
-  buildSingleChannelSecretPromptState,
   hasConfiguredSecretInput,
   promptSingleChannelSecretInput,
   type ChannelOnboardingAdapter,
@@ -13,7 +12,7 @@ import {
   resolveDefaultMattermostAccountId,
   resolveMattermostAccount,
 } from "./mattermost/accounts.js";
-import { resolveAccountIdForConfigure } from "./onboarding-helpers.js";
+import { promptAccountId } from "./onboarding-helpers.js";
 
 const channel = "mattermost" as const;
 
@@ -66,16 +65,19 @@ export const mattermostOnboardingAdapter: ChannelOnboardingAdapter = {
     };
   },
   configure: async ({ cfg, prompter, accountOverrides, shouldPromptAccountIds }) => {
+    const override = accountOverrides.mattermost?.trim();
     const defaultAccountId = resolveDefaultMattermostAccountId(cfg);
-    const accountId = await resolveAccountIdForConfigure({
-      cfg,
-      prompter,
-      label: "Mattermost",
-      accountOverride: accountOverrides.mattermost,
-      shouldPromptAccountIds,
-      listAccountIds: listMattermostAccountIds,
-      defaultAccountId,
-    });
+    let accountId = override ? normalizeAccountId(override) : defaultAccountId;
+    if (shouldPromptAccountIds && !override) {
+      accountId = await promptAccountId({
+        cfg,
+        prompter,
+        label: "Mattermost",
+        currentId: accountId,
+        listAccountIds: listMattermostAccountIds,
+        defaultAccountId,
+      });
+    }
 
     let next = cfg;
     const resolvedAccount = resolveMattermostAccount({
@@ -85,17 +87,12 @@ export const mattermostOnboardingAdapter: ChannelOnboardingAdapter = {
     });
     const accountConfigured = Boolean(resolvedAccount.botToken && resolvedAccount.baseUrl);
     const allowEnv = accountId === DEFAULT_ACCOUNT_ID;
+    const canUseEnv =
+      allowEnv &&
+      Boolean(process.env.MATTERMOST_BOT_TOKEN?.trim()) &&
+      Boolean(process.env.MATTERMOST_URL?.trim());
     const hasConfigToken = hasConfiguredSecretInput(resolvedAccount.config.botToken);
     const hasConfigValues = hasConfigToken || Boolean(resolvedAccount.config.baseUrl);
-    const tokenPromptState = buildSingleChannelSecretPromptState({
-      accountConfigured,
-      hasConfigToken,
-      allowEnv: allowEnv && !hasConfigValues,
-      envValue:
-        process.env.MATTERMOST_BOT_TOKEN?.trim() && process.env.MATTERMOST_URL?.trim()
-          ? process.env.MATTERMOST_BOT_TOKEN
-          : undefined,
-    });
 
     let botToken: SecretInput | null = null;
     let baseUrl: string | null = null;
@@ -109,9 +106,9 @@ export const mattermostOnboardingAdapter: ChannelOnboardingAdapter = {
       prompter,
       providerHint: "mattermost",
       credentialLabel: "bot token",
-      accountConfigured: tokenPromptState.accountConfigured,
-      canUseEnv: tokenPromptState.canUseEnv,
-      hasConfigToken: tokenPromptState.hasConfigToken,
+      accountConfigured,
+      canUseEnv: canUseEnv && !hasConfigValues,
+      hasConfigToken,
       envPrompt: "MATTERMOST_BOT_TOKEN + MATTERMOST_URL detected. Use env vars?",
       keepPrompt: "Mattermost bot token already configured. Keep it?",
       inputPrompt: "Enter Mattermost bot token",

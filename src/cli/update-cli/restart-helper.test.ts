@@ -98,8 +98,7 @@ describe("restart-helper", () => {
       expect(scriptPath.endsWith(".sh")).toBe(true);
       expect(content).toContain("#!/bin/sh");
       expect(content).toContain("launchctl kickstart -k 'gui/501/ai.openclaw.gateway'");
-      // Should clear disabled state and fall back to bootstrap when kickstart fails.
-      expect(content).toContain("launchctl enable 'gui/501/ai.openclaw.gateway'");
+      // Should fall back to bootstrap when kickstart fails (service deregistered after bootout)
       expect(content).toContain("launchctl bootstrap 'gui/501'");
       expect(content).toContain('rm -f "$0"');
       await cleanupScript(scriptPath);
@@ -299,25 +298,11 @@ describe("restart-helper", () => {
 
       await runRestartScript(scriptPath);
 
-      expect(spawn).toHaveBeenCalledWith("cmd.exe", ["/d", "/s", "/c", scriptPath], {
+      expect(spawn).toHaveBeenCalledWith("cmd.exe", ["/c", scriptPath], {
         detached: true,
         stdio: "ignore",
       });
       expect(mockChild.unref).toHaveBeenCalled();
-    });
-
-    it("quotes cmd.exe /c paths with metacharacters on Windows", async () => {
-      Object.defineProperty(process, "platform", { value: "win32" });
-      const scriptPath = "C:\\Temp\\me&(ow)\\fake-script.bat";
-      const mockChild = { unref: vi.fn() };
-      vi.mocked(spawn).mockReturnValue(mockChild as unknown as ChildProcess);
-
-      await runRestartScript(scriptPath);
-
-      expect(spawn).toHaveBeenCalledWith("cmd.exe", ["/d", "/s", "/c", `"${scriptPath}"`], {
-        detached: true,
-        stdio: "ignore",
-      });
     });
   });
 });

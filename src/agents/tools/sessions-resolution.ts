@@ -1,7 +1,6 @@
 import type { OpenClawConfig } from "../../config/config.js";
 import { callGateway } from "../../gateway/call.js";
 import { isAcpSessionKey, normalizeMainKey } from "../../routing/session-key.js";
-import { looksLikeSessionId } from "../../sessions/session-id.js";
 
 function normalizeKey(value?: string) {
   const trimmed = value?.trim();
@@ -113,7 +112,11 @@ export async function isResolvedSessionVisibleToRequester(params: {
   });
 }
 
-export { looksLikeSessionId };
+const SESSION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function looksLikeSessionId(value: string): boolean {
+  return SESSION_ID_RE.test(value.trim());
+}
 
 export function looksLikeSessionKey(value: string): boolean {
   const raw = value.trim();

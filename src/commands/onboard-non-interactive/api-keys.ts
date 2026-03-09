@@ -70,8 +70,7 @@ export async function resolveNonInteractiveApiKey(params: {
   const resolvedEnvKey = envResolved?.apiKey ?? explicitEnvKey;
   const resolvedEnvVarName = parseEnvVarNameFromSourceLabel(envResolved?.source) ?? explicitEnvVar;
 
-  const useSecretRefMode = params.secretInputMode === "ref"; // pragma: allowlist secret
-  if (useSecretRefMode) {
+  if (params.secretInputMode === "ref") {
     if (!resolvedEnvKey && flagKey) {
       params.runtime.error(
         [

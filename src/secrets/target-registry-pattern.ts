@@ -47,8 +47,7 @@ export function compileTargetRegistryEntry(
   const pathDynamicTokenCount = countDynamicPatternTokens(pathTokens);
   const refPathTokens = entry.refPathPattern ? parsePathPattern(entry.refPathPattern) : undefined;
   const refPathDynamicTokenCount = refPathTokens ? countDynamicPatternTokens(refPathTokens) : 0;
-  const requiresSiblingRefPath = entry.secretShape === "sibling_ref"; // pragma: allowlist secret
-  if (requiresSiblingRefPath && !refPathTokens) {
+  if (entry.secretShape === "sibling_ref" && !refPathTokens) {
     throw new Error(`Missing refPathPattern for sibling_ref target: ${entry.id}`);
   }
   if (refPathTokens && refPathDynamicTokenCount !== pathDynamicTokenCount) {

@@ -10,7 +10,8 @@ import {
 import { rejectPendingPairingRequest } from "./pairing-pending.js";
 import { generatePairingToken, verifyPairingToken } from "./pairing-token.js";
 
-type NodePairingNodeMetadata = {
+export type NodePairingPendingRequest = {
+  requestId: string;
   nodeId: string;
   displayName?: string;
   platform?: string;
@@ -23,18 +24,26 @@ type NodePairingNodeMetadata = {
   commands?: string[];
   permissions?: Record<string, boolean>;
   remoteIp?: string;
-};
-
-export type NodePairingPendingRequest = NodePairingNodeMetadata & {
-  requestId: string;
   silent?: boolean;
   isRepair?: boolean;
   ts: number;
 };
 
-export type NodePairingPairedNode = Omit<NodePairingNodeMetadata, "requestId"> & {
+export type NodePairingPairedNode = {
+  nodeId: string;
   token: string;
+  displayName?: string;
+  platform?: string;
+  version?: string;
+  coreVersion?: string;
+  uiVersion?: string;
+  deviceFamily?: string;
+  modelIdentifier?: string;
+  caps?: string[];
+  commands?: string[];
   bins?: string[];
+  permissions?: Record<string, boolean>;
+  remoteIp?: string;
   createdAtMs: number;
   approvedAtMs: number;
   lastConnectedAtMs?: number;

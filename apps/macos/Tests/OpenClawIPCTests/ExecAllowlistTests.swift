@@ -59,21 +59,21 @@ struct ExecAllowlistTests {
             cwd: nil)
     }
 
-    @Test func `match uses resolved path`() {
+    @Test func matchUsesResolvedPath() {
         let entry = ExecAllowlistEntry(pattern: "/opt/homebrew/bin/rg")
         let resolution = Self.homebrewRGResolution()
         let match = ExecAllowlistMatcher.match(entries: [entry], resolution: resolution)
         #expect(match?.pattern == entry.pattern)
     }
 
-    @Test func `match ignores basename pattern`() {
+    @Test func matchIgnoresBasenamePattern() {
         let entry = ExecAllowlistEntry(pattern: "rg")
         let resolution = Self.homebrewRGResolution()
         let match = ExecAllowlistMatcher.match(entries: [entry], resolution: resolution)
         #expect(match == nil)
     }
 
-    @Test func `match ignores basename for relative executable`() {
+    @Test func matchIgnoresBasenameForRelativeExecutable() {
         let entry = ExecAllowlistEntry(pattern: "echo")
         let resolution = ExecCommandResolution(
             rawExecutable: "./echo",
@@ -84,21 +84,21 @@ struct ExecAllowlistTests {
         #expect(match == nil)
     }
 
-    @Test func `match is case insensitive`() {
+    @Test func matchIsCaseInsensitive() {
         let entry = ExecAllowlistEntry(pattern: "/OPT/HOMEBREW/BIN/RG")
         let resolution = Self.homebrewRGResolution()
         let match = ExecAllowlistMatcher.match(entries: [entry], resolution: resolution)
         #expect(match?.pattern == entry.pattern)
     }
 
-    @Test func `match supports glob star`() {
+    @Test func matchSupportsGlobStar() {
         let entry = ExecAllowlistEntry(pattern: "/opt/**/rg")
         let resolution = Self.homebrewRGResolution()
         let match = ExecAllowlistMatcher.match(entries: [entry], resolution: resolution)
         #expect(match?.pattern == entry.pattern)
     }
 
-    @Test func `resolve for allowlist splits shell chains`() {
+    @Test func resolveForAllowlistSplitsShellChains() {
         let command = ["/bin/sh", "-lc", "echo allowlisted && /usr/bin/touch /tmp/openclaw-allowlist-test"]
         let resolutions = ExecCommandResolution.resolveForAllowlist(
             command: command,
@@ -110,7 +110,7 @@ struct ExecAllowlistTests {
         #expect(resolutions[1].executableName == "touch")
     }
 
-    @Test func `resolve for allowlist keeps quoted operators in single segment`() {
+    @Test func resolveForAllowlistKeepsQuotedOperatorsInSingleSegment() {
         let command = ["/bin/sh", "-lc", "echo \"a && b\""]
         let resolutions = ExecCommandResolution.resolveForAllowlist(
             command: command,
@@ -121,7 +121,7 @@ struct ExecAllowlistTests {
         #expect(resolutions[0].executableName == "echo")
     }
 
-    @Test func `resolve for allowlist fails closed on command substitution`() {
+    @Test func resolveForAllowlistFailsClosedOnCommandSubstitution() {
         let command = ["/bin/sh", "-lc", "echo $(/usr/bin/touch /tmp/openclaw-allowlist-test-subst)"]
         let resolutions = ExecCommandResolution.resolveForAllowlist(
             command: command,
@@ -131,7 +131,7 @@ struct ExecAllowlistTests {
         #expect(resolutions.isEmpty)
     }
 
-    @Test func `resolve for allowlist fails closed on quoted command substitution`() {
+    @Test func resolveForAllowlistFailsClosedOnQuotedCommandSubstitution() {
         let command = ["/bin/sh", "-lc", "echo \"ok $(/usr/bin/touch /tmp/openclaw-allowlist-test-quoted-subst)\""]
         let resolutions = ExecCommandResolution.resolveForAllowlist(
             command: command,
@@ -141,7 +141,7 @@ struct ExecAllowlistTests {
         #expect(resolutions.isEmpty)
     }
 
-    @Test func `resolve for allowlist fails closed on quoted backticks`() {
+    @Test func resolveForAllowlistFailsClosedOnQuotedBackticks() {
         let command = ["/bin/sh", "-lc", "echo \"ok `/usr/bin/id`\""]
         let resolutions = ExecCommandResolution.resolveForAllowlist(
             command: command,
@@ -151,7 +151,7 @@ struct ExecAllowlistTests {
         #expect(resolutions.isEmpty)
     }
 
-    @Test func `resolve for allowlist matches shared shell parser fixture`() throws {
+    @Test func resolveForAllowlistMatchesSharedShellParserFixture() throws {
         let fixtures = try Self.loadShellParserParityCases()
         for fixture in fixtures {
             let resolutions = ExecCommandResolution.resolveForAllowlist(
@@ -169,7 +169,7 @@ struct ExecAllowlistTests {
         }
     }
 
-    @Test func `resolve matches shared wrapper resolution fixture`() throws {
+    @Test func resolveMatchesSharedWrapperResolutionFixture() throws {
         let fixtures = try Self.loadWrapperResolutionParityCases()
         for fixture in fixtures {
             let resolution = ExecCommandResolution.resolve(
@@ -180,7 +180,7 @@ struct ExecAllowlistTests {
         }
     }
 
-    @Test func `resolve for allowlist treats plain sh invocation as direct exec`() {
+    @Test func resolveForAllowlistTreatsPlainShInvocationAsDirectExec() {
         let command = ["/bin/sh", "./script.sh"]
         let resolutions = ExecCommandResolution.resolveForAllowlist(
             command: command,
@@ -191,7 +191,7 @@ struct ExecAllowlistTests {
         #expect(resolutions[0].executableName == "sh")
     }
 
-    @Test func `resolve for allowlist unwraps env shell wrapper chains`() {
+    @Test func resolveForAllowlistUnwrapsEnvShellWrapperChains() {
         let command = [
             "/usr/bin/env",
             "/bin/sh",
@@ -208,7 +208,7 @@ struct ExecAllowlistTests {
         #expect(resolutions[1].executableName == "touch")
     }
 
-    @Test func `resolve for allowlist unwraps env to effective direct executable`() {
+    @Test func resolveForAllowlistUnwrapsEnvToEffectiveDirectExecutable() {
         let command = ["/usr/bin/env", "FOO=bar", "/usr/bin/printf", "ok"]
         let resolutions = ExecCommandResolution.resolveForAllowlist(
             command: command,
@@ -220,7 +220,7 @@ struct ExecAllowlistTests {
         #expect(resolutions[0].executableName == "printf")
     }
 
-    @Test func `match all requires every segment to match`() {
+    @Test func matchAllRequiresEverySegmentToMatch() {
         let first = ExecCommandResolution(
             rawExecutable: "echo",
             resolvedPath: "/usr/bin/echo",

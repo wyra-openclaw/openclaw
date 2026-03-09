@@ -119,10 +119,9 @@ function createAuthStorage(AuthStorageLike: unknown, path: string, creds: PiCred
       ? withFactory.create(path)
       : new (AuthStorageLike as { new (path: string): unknown })(path)
   ) as PiAuthStorage & {
-    setRuntimeApiKey?: (provider: string, apiKey: string) => void; // pragma: allowlist secret
+    setRuntimeApiKey?: (provider: string, apiKey: string) => void;
   };
-  const hasRuntimeApiKeyOverride = typeof withRuntimeOverride.setRuntimeApiKey === "function"; // pragma: allowlist secret
-  if (hasRuntimeApiKeyOverride) {
+  if (typeof withRuntimeOverride.setRuntimeApiKey === "function") {
     for (const [provider, credential] of Object.entries(creds)) {
       if (credential.type === "api_key") {
         withRuntimeOverride.setRuntimeApiKey(provider, credential.key);

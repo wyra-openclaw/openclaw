@@ -1,11 +1,7 @@
-import {
-  normalizeStringEntries,
-  resolveAllowlistMatchByCandidates,
-  type AllowlistMatch,
-} from "openclaw/plugin-sdk/matrix";
+import { resolveAllowlistMatchByCandidates, type AllowlistMatch } from "openclaw/plugin-sdk/matrix";
 
 function normalizeAllowList(list?: Array<string | number>) {
-  return normalizeStringEntries(list);
+  return (list ?? []).map((entry) => String(entry).trim()).filter(Boolean);
 }
 
 function normalizeMatrixUser(raw?: string | null): string {

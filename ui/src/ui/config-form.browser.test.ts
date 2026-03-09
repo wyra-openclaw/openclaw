@@ -365,7 +365,7 @@ describe("config form renderer", () => {
           "models.providers.*.apiKey": { sensitive: true },
         },
         unsupportedPaths: analysis.unsupportedPaths,
-        value: { models: { providers: { openai: { apiKey: "old" } } } }, // pragma: allowlist secret
+        value: { models: { providers: { openai: { apiKey: "old" } } } },
         onPatch,
       }),
       container,

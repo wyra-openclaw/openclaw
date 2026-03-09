@@ -12,7 +12,6 @@ import { type OpenClawConfig, loadConfig } from "../../config/config.js";
 import { applyLinkUnderstanding } from "../../link-understanding/apply.js";
 import { applyMediaUnderstanding } from "../../media-understanding/apply.js";
 import { defaultRuntime } from "../../runtime.js";
-import { normalizeStringEntries } from "../../shared/string-normalization.js";
 import { resolveCommandAuthorization } from "../command-auth.js";
 import type { MsgContext } from "../templating.js";
 import { SILENT_REPLY_TOKEN } from "../tokens.js";
@@ -34,7 +33,7 @@ function mergeSkillFilters(channelFilter?: string[], agentFilter?: string[]): st
     if (!Array.isArray(list)) {
       return undefined;
     }
-    return normalizeStringEntries(list);
+    return list.map((entry) => String(entry).trim()).filter(Boolean);
   };
   const channel = normalize(channelFilter);
   const agent = normalize(agentFilter);

@@ -32,7 +32,7 @@ describe("resolveModelAuthLabel", () => {
         "github-copilot:default": {
           type: "token",
           provider: "github-copilot",
-          token: "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", // pragma: allowlist secret
+          token: "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
           tokenRef: { source: "env", provider: "default", id: "GITHUB_TOKEN" },
         },
       },
@@ -52,7 +52,7 @@ describe("resolveModelAuthLabel", () => {
   });
 
   it("does not include api-key value in label for api-key profiles", () => {
-    const shortSecret = "abc123"; // pragma: allowlist secret
+    const shortSecret = "abc123";
     ensureAuthProfileStoreMock.mockReturnValue({
       version: 1,
       profiles: {

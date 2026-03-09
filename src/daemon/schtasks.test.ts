@@ -44,18 +44,15 @@ describe("scheduled task runtime derivation", () => {
     ).toEqual({ status: "running" });
   });
 
-  it("treats Running without numeric result as unknown", () => {
+  it("treats Running without last result as running", () => {
     expect(
       deriveScheduledTaskRuntimeStatus({
         status: "Running",
       }),
-    ).toEqual({
-      status: "unknown",
-      detail: "Task status is locale-dependent and no numeric Last Run Result was available.",
-    });
+    ).toEqual({ status: "running" });
   });
 
-  it("treats non-running result codes as stopped", () => {
+  it("downgrades stale Running status when last result is not a running code", () => {
     expect(
       deriveScheduledTaskRuntimeStatus({
         status: "Running",
@@ -63,48 +60,7 @@ describe("scheduled task runtime derivation", () => {
       }),
     ).toEqual({
       status: "stopped",
-      detail: "Task Last Run Result=0x0; treating as not running.",
-    });
-  });
-
-  it("detects running via result code when status is localized (German)", () => {
-    expect(
-      deriveScheduledTaskRuntimeStatus({
-        status: "Wird ausgeführt",
-        lastRunResult: "0x41301",
-      }),
-    ).toEqual({ status: "running" });
-  });
-
-  it("detects running via result code when status is localized (French)", () => {
-    expect(
-      deriveScheduledTaskRuntimeStatus({
-        status: "En cours",
-        lastRunResult: "267009",
-      }),
-    ).toEqual({ status: "running" });
-  });
-
-  it("treats localized status as stopped when result code is not a running code", () => {
-    expect(
-      deriveScheduledTaskRuntimeStatus({
-        status: "Wird ausgeführt",
-        lastRunResult: "0x0",
-      }),
-    ).toEqual({
-      status: "stopped",
-      detail: "Task Last Run Result=0x0; treating as not running.",
-    });
-  });
-
-  it("treats localized status without result code as unknown", () => {
-    expect(
-      deriveScheduledTaskRuntimeStatus({
-        status: "Wird ausgeführt",
-      }),
-    ).toEqual({
-      status: "unknown",
-      detail: "Task status is locale-dependent and no numeric Last Run Result was available.",
+      detail: "Task reports Running but Last Run Result=0x0; treating as stale runtime state.",
     });
   });
 });

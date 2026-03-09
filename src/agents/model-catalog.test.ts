@@ -238,9 +238,9 @@ describe("loadModelCatalog", () => {
   it("does not duplicate opted-in configured models already present in ModelRegistry", async () => {
     mockPiDiscoveryModels([
       {
-        id: "kilo/auto",
+        id: "anthropic/claude-opus-4.6",
         provider: "kilocode",
-        name: "Kilo Auto",
+        name: "Claude Opus 4.6",
       },
     ]);
 
@@ -253,8 +253,8 @@ describe("loadModelCatalog", () => {
               api: "openai-completions",
               models: [
                 {
-                  id: "kilo/auto",
-                  name: "Configured Kilo Auto",
+                  id: "anthropic/claude-opus-4.6",
+                  name: "Configured Claude Opus 4.6",
                   reasoning: true,
                   input: ["text", "image"],
                   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -269,9 +269,9 @@ describe("loadModelCatalog", () => {
     });
 
     const matches = result.filter(
-      (entry) => entry.provider === "kilocode" && entry.id === "kilo/auto",
+      (entry) => entry.provider === "kilocode" && entry.id === "anthropic/claude-opus-4.6",
     );
     expect(matches).toHaveLength(1);
-    expect(matches[0]?.name).toBe("Kilo Auto");
+    expect(matches[0]?.name).toBe("Claude Opus 4.6");
   });
 });

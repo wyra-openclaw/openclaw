@@ -4,7 +4,7 @@ import os
 import Testing
 @testable import OpenClaw
 
-struct GatewayConnectionTests {
+@Suite struct GatewayConnectionTests {
     private func makeConnection(
         session: GatewayTestWebSocketSession,
         token: String? = nil) throws -> (GatewayConnection, ConfigSource)
@@ -56,7 +56,7 @@ struct GatewayConnectionTests {
         }
     }
 
-    @Test func `request reuses single web socket for same config`() async throws {
+    @Test func requestReusesSingleWebSocketForSameConfig() async throws {
         let session = self.makeSession()
         let (conn, _) = try self.makeConnection(session: session)
 
@@ -68,7 +68,7 @@ struct GatewayConnectionTests {
         #expect(session.snapshotCancelCount() == 0)
     }
 
-    @Test func `request reconfigures and cancels on token change`() async throws {
+    @Test func requestReconfiguresAndCancelsOnTokenChange() async throws {
         let session = self.makeSession()
         let (conn, cfg) = try self.makeConnection(session: session, token: "a")
 
@@ -81,7 +81,7 @@ struct GatewayConnectionTests {
         #expect(session.snapshotCancelCount() == 1)
     }
 
-    @Test func `concurrent requests still use single web socket`() async throws {
+    @Test func concurrentRequestsStillUseSingleWebSocket() async throws {
         let session = self.makeSession(helloDelayMs: 150)
         let (conn, _) = try self.makeConnection(session: session)
 
@@ -92,7 +92,7 @@ struct GatewayConnectionTests {
         #expect(session.snapshotMakeCount() == 1)
     }
 
-    @Test func `subscribe replays latest snapshot`() async throws {
+    @Test func subscribeReplaysLatestSnapshot() async throws {
         let session = self.makeSession()
         let (conn, _) = try self.makeConnection(session: session)
 
@@ -109,7 +109,7 @@ struct GatewayConnectionTests {
         #expect(snap.type == "hello-ok")
     }
 
-    @Test func `subscribe emits seq gap before event`() async throws {
+    @Test func subscribeEmitsSeqGapBeforeEvent() async throws {
         let session = self.makeSession()
         let (conn, _) = try self.makeConnection(session: session)
 

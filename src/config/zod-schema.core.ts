@@ -188,7 +188,6 @@ export const ModelCompatSchema = z
     supportsDeveloperRole: z.boolean().optional(),
     supportsReasoningEffort: z.boolean().optional(),
     supportsUsageInStreaming: z.boolean().optional(),
-    supportsTools: z.boolean().optional(),
     supportsStrictMode: z.boolean().optional(),
     maxTokensField: z
       .union([z.literal("max_completion_tokens"), z.literal("max_tokens")])
@@ -234,7 +233,7 @@ export const ModelProviderSchema = z
       .optional(),
     api: ModelApiSchema.optional(),
     injectNumCtxForOpenAICompat: z.boolean().optional(),
-    headers: z.record(z.string(), SecretInputSchema.register(sensitive)).optional(),
+    headers: z.record(z.string(), z.string()).optional(),
     authHeader: z.boolean().optional(),
     models: z.array(ModelDefinitionSchema),
   })

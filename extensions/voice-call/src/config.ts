@@ -5,7 +5,6 @@ import {
   TtsProviderSchema,
 } from "openclaw/plugin-sdk/voice-call";
 import { z } from "zod";
-import { deepMergeDefined } from "./deep-merge.js";
 
 // -----------------------------------------------------------------------------
 // Phone Number Validation
@@ -351,64 +350,17 @@ export const VoiceCallConfigSchema = z
   .strict();
 
 export type VoiceCallConfig = z.infer<typeof VoiceCallConfigSchema>;
-type DeepPartial<T> =
-  T extends Array<infer U>
-    ? DeepPartial<U>[]
-    : T extends object
-      ? { [K in keyof T]?: DeepPartial<T[K]> }
-      : T;
-export type VoiceCallConfigInput = DeepPartial<VoiceCallConfig>;
 
 // -----------------------------------------------------------------------------
 // Configuration Helpers
 // -----------------------------------------------------------------------------
 
-const DEFAULT_VOICE_CALL_CONFIG = VoiceCallConfigSchema.parse({});
-
-function cloneDefaultVoiceCallConfig(): VoiceCallConfig {
-  return structuredClone(DEFAULT_VOICE_CALL_CONFIG);
-}
-
-function normalizeVoiceCallTtsConfig(
-  defaults: VoiceCallTtsConfig,
-  overrides: DeepPartial<NonNullable<VoiceCallTtsConfig>> | undefined,
-): VoiceCallTtsConfig {
-  if (!defaults && !overrides) {
-    return undefined;
-  }
-
-  return TtsConfigSchema.parse(deepMergeDefined(defaults ?? {}, overrides ?? {}));
-}
-
-export function normalizeVoiceCallConfig(config: VoiceCallConfigInput): VoiceCallConfig {
-  const defaults = cloneDefaultVoiceCallConfig();
-  return {
-    ...defaults,
-    ...config,
-    allowFrom: config.allowFrom ?? defaults.allowFrom,
-    outbound: { ...defaults.outbound, ...config.outbound },
-    serve: { ...defaults.serve, ...config.serve },
-    tailscale: { ...defaults.tailscale, ...config.tailscale },
-    tunnel: { ...defaults.tunnel, ...config.tunnel },
-    webhookSecurity: {
-      ...defaults.webhookSecurity,
-      ...config.webhookSecurity,
-      allowedHosts: config.webhookSecurity?.allowedHosts ?? defaults.webhookSecurity.allowedHosts,
-      trustedProxyIPs:
-        config.webhookSecurity?.trustedProxyIPs ?? defaults.webhookSecurity.trustedProxyIPs,
-    },
-    streaming: { ...defaults.streaming, ...config.streaming },
-    stt: { ...defaults.stt, ...config.stt },
-    tts: normalizeVoiceCallTtsConfig(defaults.tts, config.tts),
-  };
-}
-
 /**
  * Resolves the configuration by merging environment variables into missing fields.
  * Returns a new configuration object with environment variables applied.
  */
-export function resolveVoiceCallConfig(config: VoiceCallConfigInput): VoiceCallConfig {
-  const resolved = normalizeVoiceCallConfig(config);
+export function resolveVoiceCallConfig(config: VoiceCallConfig): VoiceCallConfig {
+  const resolved = JSON.parse(JSON.stringify(config)) as VoiceCallConfig;
 
   // Telnyx
   if (resolved.provider === "telnyx") {
@@ -453,7 +405,7 @@ export function resolveVoiceCallConfig(config: VoiceCallConfigInput): VoiceCallC
     resolved.webhookSecurity.trustForwardingHeaders ?? false;
   resolved.webhookSecurity.trustedProxyIPs = resolved.webhookSecurity.trustedProxyIPs ?? [];
 
-  return normalizeVoiceCallConfig(resolved);
+  return resolved;
 }
 
 /**

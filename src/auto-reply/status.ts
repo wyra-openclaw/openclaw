@@ -655,7 +655,7 @@ export function buildStatusMessage(args: StatusArgs): string {
         showFallbackAuth ? ` · 🔑 ${activeAuthLabelValue}` : ""
       } (${fallbackState.reason ?? "selected model unavailable"})`
     : null;
-  const commit = resolveCommitHash({ moduleUrl: import.meta.url });
+  const commit = resolveCommitHash();
   const versionLine = `🦞 OpenClaw ${VERSION}${commit ? ` (${commit})` : ""}`;
   const usagePair = formatUsagePair(inputTokens, outputTokens);
   const cacheLine = formatCacheLine(inputTokens, cacheRead, cacheWrite);

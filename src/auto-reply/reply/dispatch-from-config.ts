@@ -1,11 +1,6 @@
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
 import type { OpenClawConfig } from "../../config/config.js";
-import {
-  loadSessionStore,
-  resolveSessionStoreEntry,
-  resolveStorePath,
-  type SessionEntry,
-} from "../../config/sessions.js";
+import { loadSessionStore, resolveStorePath, type SessionEntry } from "../../config/sessions.js";
 import { logVerbose } from "../../globals.js";
 import { fireAndForgetHook } from "../../hooks/fire-and-forget.js";
 import { createInternalHookEvent, triggerInternalHook } from "../../hooks/internal-hooks.js";
@@ -70,7 +65,7 @@ const isInboundAudioContext = (ctx: FinalizedMsgContext): boolean => {
   return AUDIO_HEADER_RE.test(trimmed);
 };
 
-const resolveSessionStoreLookup = (
+const resolveSessionStoreEntry = (
   ctx: FinalizedMsgContext,
   cfg: OpenClawConfig,
 ): {
@@ -89,7 +84,7 @@ const resolveSessionStoreLookup = (
     const store = loadSessionStore(storePath);
     return {
       sessionKey,
-      entry: resolveSessionStoreEntry({ store, sessionKey }).existing,
+      entry: store[sessionKey.toLowerCase()] ?? store[sessionKey],
     };
   } catch {
     return {
@@ -169,7 +164,7 @@ export async function dispatchReplyFromConfig(params: {
     return { queuedFinal: false, counts: dispatcher.getQueuedCounts() };
   }
 
-  const sessionStoreEntry = resolveSessionStoreLookup(ctx, cfg);
+  const sessionStoreEntry = resolveSessionStoreEntry(ctx, cfg);
   const acpDispatchSessionKey = sessionStoreEntry.sessionKey ?? sessionKey;
   const inboundAudio = isInboundAudioContext(ctx);
   const sessionTtsAuto = normalizeTtsAutoMode(sessionStoreEntry.entry?.ttsAuto);

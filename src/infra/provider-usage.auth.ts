@@ -8,7 +8,6 @@ import {
   resolveApiKeyForProfile,
   resolveAuthProfileOrder,
 } from "../agents/auth-profiles.js";
-import { isNonSecretApiKeyMarker } from "../agents/model-auth-markers.js";
 import { getCustomProviderApiKey } from "../agents/model-auth.js";
 import { normalizeProviderId } from "../agents/model-selection.js";
 import { loadConfig } from "../config/config.js";
@@ -104,7 +103,7 @@ function resolveProviderApiKeyFromConfigAndStore(params: {
 
   const cfg = loadConfig();
   const key = getCustomProviderApiKey(cfg, params.providerId);
-  if (key && !isNonSecretApiKeyMarker(key)) {
+  if (key) {
     return key;
   }
 
@@ -123,17 +122,9 @@ function resolveProviderApiKeyFromConfigAndStore(params: {
     return undefined;
   }
   if (cred.type === "api_key") {
-    const key = normalizeSecretInput(cred.key);
-    if (key && !isNonSecretApiKeyMarker(key)) {
-      return key;
-    }
-    return undefined;
+    return normalizeSecretInput(cred.key);
   }
-  const token = normalizeSecretInput(cred.token);
-  if (token && !isNonSecretApiKeyMarker(token)) {
-    return token;
-  }
-  return undefined;
+  return normalizeSecretInput(cred.token);
 }
 
 async function resolveOAuthToken(params: {

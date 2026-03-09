@@ -52,7 +52,7 @@ const AUDIO_CAPABILITY_CFG = {
   models: {
     providers: {
       openai: {
-        apiKey: "test-key", // pragma: allowlist secret
+        apiKey: "test-key",
         models: [],
       },
     },

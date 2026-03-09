@@ -66,9 +66,8 @@ describe("stripEnvelopeFromMessage", () => {
       content:
         'Thread starter (untrusted, for context):\n```json\n{"seed": 1}\n```\n\nSender (untrusted metadata):\n```json\n{"name": "alice"}\n```\n\nActual user message',
     };
-    const result = stripEnvelopeFromMessage(input) as { content?: string; senderLabel?: string };
+    const result = stripEnvelopeFromMessage(input) as { content?: string };
     expect(result.content).toBe("Actual user message");
-    expect(result.senderLabel).toBe("alice");
   });
 
   test("strips metadata-like blocks even when not a prefix", () => {

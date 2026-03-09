@@ -1,21 +1,14 @@
-import { createScopedChannelConfigBase } from "openclaw/plugin-sdk/compat";
-import {
-  buildAccountScopedDmSecurityPolicy,
-  collectOpenProviderGroupPolicyWarnings,
-  collectOpenGroupPolicyConfiguredRouteWarnings,
-  createScopedAccountConfigAccessors,
-  formatAllowFromLowercase,
-} from "openclaw/plugin-sdk/compat";
 import {
   applyAccountNameToChannelSection,
-  buildComputedAccountStatusSnapshot,
   buildChannelConfigSchema,
   buildTokenChannelStatusSummary,
   collectDiscordAuditChannelIds,
   collectDiscordStatusIssues,
   DEFAULT_ACCOUNT_ID,
+  deleteAccountFromConfigSection,
   discordOnboardingAdapter,
   DiscordConfigSchema,
+  formatPairingApproveHint,
   getChatChannelMeta,
   inspectDiscordAccount,
   listDiscordAccountIds,
@@ -33,6 +26,9 @@ import {
   resolveDefaultDiscordAccountId,
   resolveDiscordGroupRequireMention,
   resolveDiscordGroupToolPolicy,
+  resolveOpenProviderRuntimeGroupPolicy,
+  resolveDefaultGroupPolicy,
+  setAccountEnabledInConfigSection,
   type ChannelMessageActionAdapter,
   type ChannelPlugin,
   type ResolvedDiscordAccount,
@@ -54,22 +50,6 @@ const discordMessageActions: ChannelMessageActionAdapter = {
     return ma.handleAction(ctx);
   },
 };
-
-const discordConfigAccessors = createScopedAccountConfigAccessors({
-  resolveAccount: ({ cfg, accountId }) => resolveDiscordAccount({ cfg, accountId }),
-  resolveAllowFrom: (account: ResolvedDiscordAccount) => account.config.dm?.allowFrom,
-  formatAllowFrom: (allowFrom) => formatAllowFromLowercase({ allowFrom }),
-  resolveDefaultTo: (account: ResolvedDiscordAccount) => account.config.defaultTo,
-});
-
-const discordConfigBase = createScopedChannelConfigBase({
-  sectionKey: "discord",
-  listAccountIds: listDiscordAccountIds,
-  resolveAccount: (cfg, accountId) => resolveDiscordAccount({ cfg, accountId }),
-  inspectAccount: (cfg, accountId) => inspectDiscordAccount({ cfg, accountId }),
-  defaultAccountId: resolveDefaultDiscordAccountId,
-  clearBaseFields: ["token", "name"],
-});
 
 export const discordPlugin: ChannelPlugin<ResolvedDiscordAccount> = {
   id: "discord",
@@ -101,7 +81,25 @@ export const discordPlugin: ChannelPlugin<ResolvedDiscordAccount> = {
   reload: { configPrefixes: ["channels.discord"] },
   configSchema: buildChannelConfigSchema(DiscordConfigSchema),
   config: {
-    ...discordConfigBase,
+    listAccountIds: (cfg) => listDiscordAccountIds(cfg),
+    resolveAccount: (cfg, accountId) => resolveDiscordAccount({ cfg, accountId }),
+    inspectAccount: (cfg, accountId) => inspectDiscordAccount({ cfg, accountId }),
+    defaultAccountId: (cfg) => resolveDefaultDiscordAccountId(cfg),
+    setAccountEnabled: ({ cfg, accountId, enabled }) =>
+      setAccountEnabledInConfigSection({
+        cfg,
+        sectionKey: "discord",
+        accountId,
+        enabled,
+        allowTopLevel: true,
+      }),
+    deleteAccount: ({ cfg, accountId }) =>
+      deleteAccountFromConfigSection({
+        cfg,
+        sectionKey: "discord",
+        accountId,
+        clearBaseFields: ["token", "name"],
+      }),
     isConfigured: (account) => Boolean(account.token?.trim()),
     describeAccount: (account) => ({
       accountId: account.accountId,
@@ -110,49 +108,58 @@ export const discordPlugin: ChannelPlugin<ResolvedDiscordAccount> = {
       configured: Boolean(account.token?.trim()),
       tokenSource: account.tokenSource,
     }),
-    ...discordConfigAccessors,
+    resolveAllowFrom: ({ cfg, accountId }) =>
+      (resolveDiscordAccount({ cfg, accountId }).config.dm?.allowFrom ?? []).map((entry) =>
+        String(entry),
+      ),
+    formatAllowFrom: ({ allowFrom }) =>
+      allowFrom
+        .map((entry) => String(entry).trim())
+        .filter(Boolean)
+        .map((entry) => entry.toLowerCase()),
+    resolveDefaultTo: ({ cfg, accountId }) =>
+      resolveDiscordAccount({ cfg, accountId }).config.defaultTo?.trim() || undefined,
   },
   security: {
     resolveDmPolicy: ({ cfg, accountId, account }) => {
-      return buildAccountScopedDmSecurityPolicy({
-        cfg,
-        channelKey: "discord",
-        accountId,
-        fallbackAccountId: account.accountId ?? DEFAULT_ACCOUNT_ID,
-        policy: account.config.dm?.policy,
+      const resolvedAccountId = accountId ?? account.accountId ?? DEFAULT_ACCOUNT_ID;
+      const useAccountPath = Boolean(cfg.channels?.discord?.accounts?.[resolvedAccountId]);
+      const allowFromPath = useAccountPath
+        ? `channels.discord.accounts.${resolvedAccountId}.dm.`
+        : "channels.discord.dm.";
+      return {
+        policy: account.config.dm?.policy ?? "pairing",
         allowFrom: account.config.dm?.allowFrom ?? [],
-        allowFromPathSuffix: "dm.",
+        allowFromPath,
+        approveHint: formatPairingApproveHint("discord"),
         normalizeEntry: (raw) => raw.replace(/^(discord|user):/i, "").replace(/^<@!?(\d+)>$/, "$1"),
-      });
+      };
     },
     collectWarnings: ({ account, cfg }) => {
+      const warnings: string[] = [];
+      const defaultGroupPolicy = resolveDefaultGroupPolicy(cfg);
+      const { groupPolicy } = resolveOpenProviderRuntimeGroupPolicy({
+        providerConfigPresent: cfg.channels?.discord !== undefined,
+        groupPolicy: account.config.groupPolicy,
+        defaultGroupPolicy,
+      });
       const guildEntries = account.config.guilds ?? {};
       const guildsConfigured = Object.keys(guildEntries).length > 0;
       const channelAllowlistConfigured = guildsConfigured;
 
-      return collectOpenProviderGroupPolicyWarnings({
-        cfg,
-        providerConfigPresent: cfg.channels?.discord !== undefined,
-        configuredGroupPolicy: account.config.groupPolicy,
-        collect: (groupPolicy) =>
-          collectOpenGroupPolicyConfiguredRouteWarnings({
-            groupPolicy,
-            routeAllowlistConfigured: channelAllowlistConfigured,
-            configureRouteAllowlist: {
-              surface: "Discord guilds",
-              openScope: "any channel not explicitly denied",
-              groupPolicyPath: "channels.discord.groupPolicy",
-              routeAllowlistPath: "channels.discord.guilds.<id>.channels",
-            },
-            missingRouteAllowlist: {
-              surface: "Discord guilds",
-              openBehavior:
-                "with no guild/channel allowlist; any channel can trigger (mention-gated)",
-              remediation:
-                'Set channels.discord.groupPolicy="allowlist" and configure channels.discord.guilds.<id>.channels',
-            },
-          }),
-      });
+      if (groupPolicy === "open") {
+        if (channelAllowlistConfigured) {
+          warnings.push(
+            `- Discord guilds: groupPolicy="open" allows any channel not explicitly denied to trigger (mention-gated). Set channels.discord.groupPolicy="allowlist" and configure channels.discord.guilds.<id>.channels.`,
+          );
+        } else {
+          warnings.push(
+            `- Discord guilds: groupPolicy="open" with no guild/channel allowlist; any channel can trigger (mention-gated). Set channels.discord.groupPolicy="allowlist" and configure channels.discord.guilds.<id>.channels.`,
+          );
+        }
+      }
+
+      return warnings;
     },
   },
   groups: {
@@ -391,17 +398,16 @@ export const discordPlugin: ChannelPlugin<ResolvedDiscordAccount> = {
         resolveConfiguredFromCredentialStatuses(account) ?? Boolean(account.token?.trim());
       const app = runtime?.application ?? (probe as { application?: unknown })?.application;
       const bot = runtime?.bot ?? (probe as { bot?: unknown })?.bot;
-      const base = buildComputedAccountStatusSnapshot({
+      return {
         accountId: account.accountId,
         name: account.name,
         enabled: account.enabled,
         configured,
-        runtime,
-        probe,
-      });
-      return {
-        ...base,
         ...projectCredentialSnapshotFields(account),
+        running: runtime?.running ?? false,
+        lastStartAt: runtime?.lastStartAt ?? null,
+        lastStopAt: runtime?.lastStopAt ?? null,
+        lastError: runtime?.lastError ?? null,
         connected: runtime?.connected ?? false,
         reconnectAttempts: runtime?.reconnectAttempts,
         lastConnectedAt: runtime?.lastConnectedAt ?? null,
@@ -409,7 +415,10 @@ export const discordPlugin: ChannelPlugin<ResolvedDiscordAccount> = {
         lastEventAt: runtime?.lastEventAt ?? null,
         application: app ?? undefined,
         bot: bot ?? undefined,
+        probe,
         audit,
+        lastInboundAt: runtime?.lastInboundAt ?? null,
+        lastOutboundAt: runtime?.lastOutboundAt ?? null,
       };
     },
   },

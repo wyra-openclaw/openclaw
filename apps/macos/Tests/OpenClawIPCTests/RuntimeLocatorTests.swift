@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import OpenClaw
 
-struct RuntimeLocatorTests {
+@Suite struct RuntimeLocatorTests {
     private func makeTempExecutable(contents: String) throws -> URL {
         let dir = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -13,7 +13,7 @@ struct RuntimeLocatorTests {
         return path
     }
 
-    @Test func `resolve succeeds with valid node`() throws {
+    @Test func resolveSucceedsWithValidNode() throws {
         let script = """
         #!/bin/sh
         echo v22.5.0
@@ -28,7 +28,7 @@ struct RuntimeLocatorTests {
         #expect(res.version == RuntimeVersion(major: 22, minor: 5, patch: 0))
     }
 
-    @Test func `resolve fails when too old`() throws {
+    @Test func resolveFailsWhenTooOld() throws {
         let script = """
         #!/bin/sh
         echo v18.2.0
@@ -43,7 +43,7 @@ struct RuntimeLocatorTests {
         #expect(path == node.path)
     }
 
-    @Test func `resolve fails when version unparsable`() throws {
+    @Test func resolveFailsWhenVersionUnparsable() throws {
         let script = """
         #!/bin/sh
         echo node-version:unknown
@@ -58,12 +58,12 @@ struct RuntimeLocatorTests {
         #expect(path == node.path)
     }
 
-    @Test func `describe failure includes paths`() {
+    @Test func describeFailureIncludesPaths() {
         let msg = RuntimeLocator.describeFailure(.notFound(searchPaths: ["/tmp/a", "/tmp/b"]))
         #expect(msg.contains("PATH searched: /tmp/a:/tmp/b"))
     }
 
-    @Test func `runtime version parses with leading V and metadata`() {
+    @Test func runtimeVersionParsesWithLeadingVAndMetadata() {
         #expect(RuntimeVersion.from(string: "v22.1.3") == RuntimeVersion(major: 22, minor: 1, patch: 3))
         #expect(RuntimeVersion.from(string: "node 22.3.0-alpha.1") == RuntimeVersion(major: 22, minor: 3, patch: 0))
         #expect(RuntimeVersion.from(string: "bogus") == nil)

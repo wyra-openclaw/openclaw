@@ -58,7 +58,7 @@ export const de: TranslationMap = {
       subtitle: "Wo sich das Dashboard verbindet und wie es sich authentifiziert.",
       wsUrl: "WebSocket-URL",
       token: "Gateway-Token",
-      password: "Passwort (nicht gespeichert)", // pragma: allowlist secret
+      password: "Passwort (nicht gespeichert)",
       sessionKey: "Standard-Sitzungsschlüssel",
       language: "Sprache",
       connectHint: "Klicken Sie auf Verbinden, um Verbindungsänderungen anzuwenden.",

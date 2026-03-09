@@ -20,12 +20,7 @@ import {
   normalizeRateLimitClientIp,
   type AuthRateLimiter,
 } from "./auth-rate-limit.js";
-import {
-  authorizeHttpGatewayConnect,
-  isLocalDirectRequest,
-  type GatewayAuthResult,
-  type ResolvedGatewayAuth,
-} from "./auth.js";
+import { type GatewayAuthResult, type ResolvedGatewayAuth } from "./auth.js";
 import { normalizeCanvasScopedUrl } from "./canvas-capability.js";
 import {
   handleControlUiAvatarRequest,
@@ -51,7 +46,6 @@ import {
   resolveHookDeliver,
 } from "./hooks.js";
 import { sendGatewayAuthFailure, setDefaultSecurityHeaders } from "./http-common.js";
-import { getBearerToken } from "./http-utils.js";
 import { handleOpenAiHttpRequest } from "./openai-http.js";
 import { handleOpenResponsesHttpRequest } from "./openresponses-http.js";
 import {
@@ -65,7 +59,6 @@ import {
   type PluginHttpRequestHandler,
   type PluginRoutePathContext,
 } from "./server/plugins-http.js";
-import type { ReadinessChecker } from "./server/readiness.js";
 import type { GatewayWsClient } from "./server/ws-types.js";
 import { handleToolsInvokeHttpRequest } from "./tools-invoke-http.js";
 
@@ -157,39 +150,11 @@ function shouldEnforceDefaultPluginGatewayAuth(pathContext: PluginRoutePathConte
   );
 }
 
-async function canRevealReadinessDetails(params: {
-  req: IncomingMessage;
-  resolvedAuth: ResolvedGatewayAuth;
-  trustedProxies: string[];
-  allowRealIpFallback: boolean;
-}): Promise<boolean> {
-  if (isLocalDirectRequest(params.req, params.trustedProxies, params.allowRealIpFallback)) {
-    return true;
-  }
-  if (params.resolvedAuth.mode === "none") {
-    return false;
-  }
-
-  const bearerToken = getBearerToken(params.req);
-  const authResult = await authorizeHttpGatewayConnect({
-    auth: params.resolvedAuth,
-    connectAuth: bearerToken ? { token: bearerToken, password: bearerToken } : null,
-    req: params.req,
-    trustedProxies: params.trustedProxies,
-    allowRealIpFallback: params.allowRealIpFallback,
-  });
-  return authResult.ok;
-}
-
-async function handleGatewayProbeRequest(
+function handleGatewayProbeRequest(
   req: IncomingMessage,
   res: ServerResponse,
   requestPath: string,
-  resolvedAuth: ResolvedGatewayAuth,
-  trustedProxies: string[],
-  allowRealIpFallback: boolean,
-  getReadiness?: ReadinessChecker,
-): Promise<boolean> {
+): boolean {
   const status = GATEWAY_PROBE_STATUS_BY_PATH.get(requestPath);
   if (!status) {
     return false;
@@ -204,34 +169,14 @@ async function handleGatewayProbeRequest(
     return true;
   }
 
+  res.statusCode = 200;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.setHeader("Cache-Control", "no-store");
-
-  let statusCode: number;
-  let body: string;
-  if (status === "ready" && getReadiness) {
-    const includeDetails = await canRevealReadinessDetails({
-      req,
-      resolvedAuth,
-      trustedProxies,
-      allowRealIpFallback,
-    });
-    try {
-      const result = getReadiness();
-      statusCode = result.ready ? 200 : 503;
-      body = JSON.stringify(includeDetails ? result : { ready: result.ready });
-    } catch {
-      statusCode = 503;
-      body = JSON.stringify(
-        includeDetails ? { ready: false, failing: ["internal"], uptimeMs: 0 } : { ready: false },
-      );
-    }
-  } else {
-    statusCode = 200;
-    body = JSON.stringify({ ok: true, status });
+  if (method === "HEAD") {
+    res.end();
+    return true;
   }
-  res.statusCode = statusCode;
-  res.end(method === "HEAD" ? undefined : body);
+  res.end(JSON.stringify({ ok: true, status }));
   return true;
 }
 
@@ -298,7 +243,6 @@ function buildPluginRequestStages(params: {
   if (!params.handlePluginRequest) {
     return [];
   }
-  let pluginGatewayAuthSatisfied = false;
   return [
     {
       name: "plugin-auth",
@@ -326,7 +270,6 @@ function buildPluginRequestStages(params: {
         if (!pluginAuthOk) {
           return true;
         }
-        pluginGatewayAuthSatisfied = true;
         return false;
       },
     },
@@ -335,11 +278,7 @@ function buildPluginRequestStages(params: {
       run: () => {
         const pathContext =
           params.pluginPathContext ?? resolvePluginRoutePathContext(params.requestPath);
-        return (
-          params.handlePluginRequest?.(params.req, params.res, pathContext, {
-            gatewayAuthSatisfied: pluginGatewayAuthSatisfied,
-          }) ?? false
-        );
+        return params.handlePluginRequest?.(params.req, params.res, pathContext) ?? false;
       },
     },
   ];
@@ -389,14 +328,6 @@ export function createHooksRequestHandler(
       return true;
     }
 
-    if (req.method !== "POST") {
-      res.statusCode = 405;
-      res.setHeader("Allow", "POST");
-      res.setHeader("Content-Type", "text/plain; charset=utf-8");
-      res.end("Method Not Allowed");
-      return true;
-    }
-
     const token = extractHookToken(req);
     const clientKey = resolveHookClientKey(req);
     if (!safeEqualSecret(token, hooksConfig.token)) {
@@ -417,6 +348,14 @@ export function createHooksRequestHandler(
       return true;
     }
     hookAuthLimiter.reset(clientKey, AUTH_RATE_LIMIT_SCOPE_HOOK_AUTH);
+
+    if (req.method !== "POST") {
+      res.statusCode = 405;
+      res.setHeader("Allow", "POST");
+      res.setHeader("Content-Type", "text/plain; charset=utf-8");
+      res.end("Method Not Allowed");
+      return true;
+    }
 
     const subPath = url.pathname.slice(basePath.length).replace(/^\/+/, "");
     if (!subPath) {
@@ -580,7 +519,6 @@ export function createGatewayHttpServer(opts: {
   resolvedAuth: ResolvedGatewayAuth;
   /** Optional rate limiter for auth brute-force protection. */
   rateLimiter?: AuthRateLimiter;
-  getReadiness?: ReadinessChecker;
   tlsOptions?: TlsOptions;
 }): HttpServer {
   const {
@@ -599,7 +537,6 @@ export function createGatewayHttpServer(opts: {
     shouldEnforcePluginGatewayAuth,
     resolvedAuth,
     rateLimiter,
-    getReadiness,
   } = opts;
   const httpServer: HttpServer = opts.tlsOptions
     ? createHttpsServer(opts.tlsOptions, (req, res) => {
@@ -756,16 +693,7 @@ export function createGatewayHttpServer(opts: {
 
       requestStages.push({
         name: "gateway-probes",
-        run: () =>
-          handleGatewayProbeRequest(
-            req,
-            res,
-            requestPath,
-            resolvedAuth,
-            trustedProxies,
-            allowRealIpFallback,
-            getReadiness,
-          ),
+        run: () => handleGatewayProbeRequest(req, res, requestPath),
       });
 
       if (await runGatewayHttpRequestStages(requestStages)) {

@@ -1,6 +1,14 @@
-import { createPluginRuntimeStore } from "openclaw/plugin-sdk/compat";
 import type { PluginRuntime } from "openclaw/plugin-sdk/twitch";
 
-const { setRuntime: setTwitchRuntime, getRuntime: getTwitchRuntime } =
-  createPluginRuntimeStore<PluginRuntime>("Twitch runtime not initialized");
-export { getTwitchRuntime, setTwitchRuntime };
+let runtime: PluginRuntime | null = null;
+
+export function setTwitchRuntime(next: PluginRuntime) {
+  runtime = next;
+}
+
+export function getTwitchRuntime(): PluginRuntime {
+  if (!runtime) {
+    throw new Error("Twitch runtime not initialized");
+  }
+  return runtime;
+}

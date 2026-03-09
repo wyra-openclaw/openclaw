@@ -108,11 +108,11 @@ function removeThreadFromDeliveryContext(context?: DeliveryContext): DeliveryCon
   return next;
 }
 
-export function normalizeStoreSessionKey(sessionKey: string): string {
+function normalizeStoreSessionKey(sessionKey: string): string {
   return sessionKey.trim().toLowerCase();
 }
 
-export function resolveSessionStoreEntry(params: {
+function resolveStoreSessionEntry(params: {
   store: Record<string, SessionEntry>;
   sessionKey: string;
 }): {
@@ -275,7 +275,7 @@ export function readSessionUpdatedAt(params: {
 }): number | undefined {
   try {
     const store = loadSessionStore(params.storePath);
-    const resolved = resolveSessionStoreEntry({ store, sessionKey: params.sessionKey });
+    const resolved = resolveStoreSessionEntry({ store, sessionKey: params.sessionKey });
     return resolved.existing?.updatedAt;
   } catch {
     return undefined;
@@ -405,15 +405,20 @@ async function saveSessionStoreUnlocked(
           .map((entry) => entry?.sessionId)
           .filter((id): id is string => Boolean(id)),
       );
-      const archivedForDeletedSessions = archiveRemovedSessionTranscripts({
-        removedSessionFiles,
-        referencedSessionIds,
-        storePath,
-        reason: "deleted",
-        restrictToStoreDir: true,
-      });
-      for (const archivedDir of archivedForDeletedSessions) {
-        archivedDirs.add(archivedDir);
+      for (const [sessionId, sessionFile] of removedSessionFiles) {
+        if (referencedSessionIds.has(sessionId)) {
+          continue;
+        }
+        const archived = archiveSessionTranscripts({
+          sessionId,
+          storePath,
+          sessionFile,
+          reason: "deleted",
+          restrictToStoreDir: true,
+        });
+        for (const archivedPath of archived) {
+          archivedDirs.add(path.dirname(archivedPath));
+        }
       }
       if (archivedDirs.size > 0 || maintenance.resetArchiveRetentionMs != null) {
         const targetDirs =
@@ -569,32 +574,6 @@ function rememberRemovedSessionFile(
   }
 }
 
-export function archiveRemovedSessionTranscripts(params: {
-  removedSessionFiles: Iterable<[string, string | undefined]>;
-  referencedSessionIds: ReadonlySet<string>;
-  storePath: string;
-  reason: "deleted" | "reset";
-  restrictToStoreDir?: boolean;
-}): Set<string> {
-  const archivedDirs = new Set<string>();
-  for (const [sessionId, sessionFile] of params.removedSessionFiles) {
-    if (params.referencedSessionIds.has(sessionId)) {
-      continue;
-    }
-    const archived = archiveSessionTranscripts({
-      sessionId,
-      storePath: params.storePath,
-      sessionFile,
-      reason: params.reason,
-      restrictToStoreDir: params.restrictToStoreDir,
-    });
-    for (const archivedPath of archived) {
-      archivedDirs.add(path.dirname(archivedPath));
-    }
-  }
-  return archivedDirs;
-}
-
 async function writeSessionStoreAtomic(params: {
   storePath: string;
   store: Record<string, SessionEntry>;
@@ -611,7 +590,7 @@ async function writeSessionStoreAtomic(params: {
 async function persistResolvedSessionEntry(params: {
   storePath: string;
   store: Record<string, SessionEntry>;
-  resolved: ReturnType<typeof resolveSessionStoreEntry>;
+  resolved: ReturnType<typeof resolveStoreSessionEntry>;
   next: SessionEntry;
 }): Promise<SessionEntry> {
   params.store[params.resolved.normalizedKey] = params.next;
@@ -734,7 +713,7 @@ export async function updateSessionStoreEntry(params: {
   const { storePath, sessionKey, update } = params;
   return await withSessionStoreLock(storePath, async () => {
     const store = loadSessionStore(storePath, { skipCache: true });
-    const resolved = resolveSessionStoreEntry({ store, sessionKey });
+    const resolved = resolveStoreSessionEntry({ store, sessionKey });
     const existing = resolved.existing;
     if (!existing) {
       return null;
@@ -765,7 +744,7 @@ export async function recordSessionMetaFromInbound(params: {
   return await updateSessionStore(
     storePath,
     (store) => {
-      const resolved = resolveSessionStoreEntry({ store, sessionKey });
+      const resolved = resolveStoreSessionEntry({ store, sessionKey });
       const existing = resolved.existing;
       const patch = deriveSessionMetaPatch({
         ctx,
@@ -814,7 +793,7 @@ export async function updateLastRoute(params: {
   const { storePath, sessionKey, channel, to, accountId, threadId, ctx } = params;
   return await withSessionStoreLock(storePath, async () => {
     const store = loadSessionStore(storePath);
-    const resolved = resolveSessionStoreEntry({ store, sessionKey });
+    const resolved = resolveStoreSessionEntry({ store, sessionKey });
     const existing = resolved.existing;
     const now = Date.now();
     const explicitContext = normalizeDeliveryContext(params.deliveryContext);

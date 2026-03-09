@@ -63,8 +63,7 @@ function resolveApiKeySecretInput(
   if (inlineEnvRef) {
     return inlineEnvRef;
   }
-  const useSecretRefMode = options?.secretInputMode === "ref"; // pragma: allowlist secret
-  if (useSecretRefMode) {
+  if (options?.secretInputMode === "ref") {
     return resolveProviderDefaultEnvSecretRef(provider);
   }
   return normalized;

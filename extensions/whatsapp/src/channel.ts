@@ -1,14 +1,10 @@
 import {
-  buildAccountScopedDmSecurityPolicy,
-  collectAllowlistProviderGroupPolicyWarnings,
-  collectOpenGroupPolicyRouteAllowlistWarnings,
-} from "openclaw/plugin-sdk/compat";
-import {
   applyAccountNameToChannelSection,
   buildChannelConfigSchema,
   collectWhatsAppStatusIssues,
   createActionGate,
   DEFAULT_ACCOUNT_ID,
+  formatPairingApproveHint,
   getChatChannelMeta,
   listWhatsAppAccountIds,
   listWhatsAppDirectoryGroupsFromConfig,
@@ -22,6 +18,8 @@ import {
   readStringParam,
   resolveDefaultWhatsAppAccountId,
   resolveWhatsAppOutboundTarget,
+  resolveAllowlistProviderRuntimeGroupPolicy,
+  resolveDefaultGroupPolicy,
   resolveWhatsAppAccount,
   resolveWhatsAppConfigAllowFrom,
   resolveWhatsAppConfigDefaultTo,
@@ -123,43 +121,40 @@ export const whatsappPlugin: ChannelPlugin<ResolvedWhatsAppAccount> = {
   },
   security: {
     resolveDmPolicy: ({ cfg, accountId, account }) => {
-      return buildAccountScopedDmSecurityPolicy({
-        cfg,
-        channelKey: "whatsapp",
-        accountId,
-        fallbackAccountId: account.accountId ?? DEFAULT_ACCOUNT_ID,
-        policy: account.dmPolicy,
+      const resolvedAccountId = accountId ?? account.accountId ?? DEFAULT_ACCOUNT_ID;
+      const useAccountPath = Boolean(cfg.channels?.whatsapp?.accounts?.[resolvedAccountId]);
+      const basePath = useAccountPath
+        ? `channels.whatsapp.accounts.${resolvedAccountId}.`
+        : "channels.whatsapp.";
+      return {
+        policy: account.dmPolicy ?? "pairing",
         allowFrom: account.allowFrom ?? [],
-        policyPathSuffix: "dmPolicy",
+        policyPath: `${basePath}dmPolicy`,
+        allowFromPath: basePath,
+        approveHint: formatPairingApproveHint("whatsapp"),
         normalizeEntry: (raw) => normalizeE164(raw),
-      });
+      };
     },
     collectWarnings: ({ account, cfg }) => {
+      const defaultGroupPolicy = resolveDefaultGroupPolicy(cfg);
+      const { groupPolicy } = resolveAllowlistProviderRuntimeGroupPolicy({
+        providerConfigPresent: cfg.channels?.whatsapp !== undefined,
+        groupPolicy: account.groupPolicy,
+        defaultGroupPolicy,
+      });
+      if (groupPolicy !== "open") {
+        return [];
+      }
       const groupAllowlistConfigured =
         Boolean(account.groups) && Object.keys(account.groups ?? {}).length > 0;
-      return collectAllowlistProviderGroupPolicyWarnings({
-        cfg,
-        providerConfigPresent: cfg.channels?.whatsapp !== undefined,
-        configuredGroupPolicy: account.groupPolicy,
-        collect: (groupPolicy) =>
-          collectOpenGroupPolicyRouteAllowlistWarnings({
-            groupPolicy,
-            routeAllowlistConfigured: groupAllowlistConfigured,
-            restrictSenders: {
-              surface: "WhatsApp groups",
-              openScope: "any member in allowed groups",
-              groupPolicyPath: "channels.whatsapp.groupPolicy",
-              groupAllowFromPath: "channels.whatsapp.groupAllowFrom",
-            },
-            noRouteAllowlist: {
-              surface: "WhatsApp groups",
-              routeAllowlistPath: "channels.whatsapp.groups",
-              routeScope: "group",
-              groupPolicyPath: "channels.whatsapp.groupPolicy",
-              groupAllowFromPath: "channels.whatsapp.groupAllowFrom",
-            },
-          }),
-      });
+      if (groupAllowlistConfigured) {
+        return [
+          `- WhatsApp groups: groupPolicy="open" allows any member in allowed groups to trigger (mention-gated). Set channels.whatsapp.groupPolicy="allowlist" + channels.whatsapp.groupAllowFrom to restrict senders.`,
+        ];
+      }
+      return [
+        `- WhatsApp groups: groupPolicy="open" with no channels.whatsapp.groups allowlist; any group can add + ping (mention-gated). Set channels.whatsapp.groupPolicy="allowlist" + channels.whatsapp.groupAllowFrom or configure channels.whatsapp.groups.`,
+      ];
     },
   },
   setup: {

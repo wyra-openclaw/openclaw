@@ -1,5 +1,4 @@
 import {
-  buildOauthProviderAuthResult,
   emptyPluginConfigSchema,
   type OpenClawPluginApi,
   type ProviderAuthContext,
@@ -61,14 +60,22 @@ function createOAuthHandler(region: MiniMaxRegion) {
         await ctx.prompter.note(result.notification_message, "MiniMax OAuth");
       }
 
+      const profileId = `${PROVIDER_ID}:default`;
       const baseUrl = result.resourceUrl || defaultBaseUrl;
 
-      return buildOauthProviderAuthResult({
-        providerId: PROVIDER_ID,
-        defaultModel: modelRef(DEFAULT_MODEL),
-        access: result.access,
-        refresh: result.refresh,
-        expires: result.expires,
+      return {
+        profiles: [
+          {
+            profileId,
+            credential: {
+              type: "oauth" as const,
+              provider: PROVIDER_ID,
+              access: result.access,
+              refresh: result.refresh,
+              expires: result.expires,
+            },
+          },
+        ],
         configPatch: {
           models: {
             providers: {
@@ -112,12 +119,13 @@ function createOAuthHandler(region: MiniMaxRegion) {
             },
           },
         },
+        defaultModel: modelRef(DEFAULT_MODEL),
         notes: [
           "MiniMax OAuth tokens auto-refresh. Re-run login if refresh fails or access is revoked.",
           `Base URL defaults to ${defaultBaseUrl}. Override models.providers.${PROVIDER_ID}.baseUrl if needed.`,
           ...(result.notification_message ? [result.notification_message] : []),
         ],
-      });
+      };
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       progress.stop(`MiniMax OAuth failed: ${errorMsg}`);

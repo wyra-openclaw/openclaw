@@ -22,7 +22,6 @@ import type {
   CronPayloadPatch,
 } from "../types.js";
 import { normalizeHttpWebhookUrl } from "../webhook-url.js";
-import { resolveInitialCronDelivery } from "./initial-delivery.js";
 import {
   normalizeOptionalAgentId,
   normalizeOptionalSessionKey,
@@ -545,7 +544,7 @@ export function createJob(state: CronServiceState, input: CronJobCreate): CronJo
     sessionTarget: input.sessionTarget,
     wakeMode: input.wakeMode,
     payload: input.payload,
-    delivery: resolveInitialCronDelivery(input),
+    delivery: input.delivery,
     failureAlert: input.failureAlert,
     state: {
       ...input.state,

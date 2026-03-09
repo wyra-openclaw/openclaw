@@ -5,7 +5,6 @@ const PORTABLE_ENV_VAR_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;
 type HostEnvSecurityPolicy = {
   blockedKeys: string[];
   blockedOverrideKeys?: string[];
-  blockedOverridePrefixes?: string[];
   blockedPrefixes: string[];
 };
 
@@ -19,9 +18,6 @@ export const HOST_DANGEROUS_ENV_PREFIXES: readonly string[] = Object.freeze(
 );
 export const HOST_DANGEROUS_OVERRIDE_ENV_KEY_VALUES: readonly string[] = Object.freeze(
   (HOST_ENV_SECURITY_POLICY.blockedOverrideKeys ?? []).map((key) => key.toUpperCase()),
-);
-export const HOST_DANGEROUS_OVERRIDE_ENV_PREFIXES: readonly string[] = Object.freeze(
-  (HOST_ENV_SECURITY_POLICY.blockedOverridePrefixes ?? []).map((prefix) => prefix.toUpperCase()),
 );
 export const HOST_SHELL_WRAPPER_ALLOWED_OVERRIDE_ENV_KEY_VALUES: readonly string[] = Object.freeze([
   "TERM",
@@ -72,11 +68,7 @@ export function isDangerousHostEnvOverrideVarName(rawKey: string): boolean {
   if (!key) {
     return false;
   }
-  const upper = key.toUpperCase();
-  if (HOST_DANGEROUS_OVERRIDE_ENV_KEYS.has(upper)) {
-    return true;
-  }
-  return HOST_DANGEROUS_OVERRIDE_ENV_PREFIXES.some((prefix) => upper.startsWith(prefix));
+  return HOST_DANGEROUS_OVERRIDE_ENV_KEYS.has(key.toUpperCase());
 }
 
 export function sanitizeHostExecEnv(params?: {

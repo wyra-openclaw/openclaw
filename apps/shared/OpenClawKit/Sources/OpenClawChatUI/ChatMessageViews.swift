@@ -143,7 +143,6 @@ struct ChatMessageBubble: View {
     let style: OpenClawChatView.Style
     let markdownVariant: ChatMarkdownVariant
     let userAccent: Color?
-    let showsAssistantTrace: Bool
 
     var body: some View {
         ChatMessageBody(
@@ -151,8 +150,7 @@ struct ChatMessageBubble: View {
             isUser: self.isUser,
             style: self.style,
             markdownVariant: self.markdownVariant,
-            userAccent: self.userAccent,
-            showsAssistantTrace: self.showsAssistantTrace)
+            userAccent: self.userAccent)
             .frame(maxWidth: ChatUIConstants.bubbleMaxWidth, alignment: self.isUser ? .trailing : .leading)
             .frame(maxWidth: .infinity, alignment: self.isUser ? .trailing : .leading)
             .padding(.horizontal, 2)
@@ -168,14 +166,13 @@ private struct ChatMessageBody: View {
     let style: OpenClawChatView.Style
     let markdownVariant: ChatMarkdownVariant
     let userAccent: Color?
-    let showsAssistantTrace: Bool
 
     var body: some View {
         let text = self.primaryText
         let textColor = self.isUser ? OpenClawChatTheme.userText : OpenClawChatTheme.assistantText
 
         VStack(alignment: .leading, spacing: 10) {
-            if self.isToolResultMessage, self.showsAssistantTrace {
+            if self.isToolResultMessage {
                 if !text.isEmpty {
                     ToolResultCard(
                         title: self.toolResultTitle,
@@ -191,10 +188,7 @@ private struct ChatMessageBody: View {
                     font: .system(size: 14),
                     textColor: textColor)
             } else {
-                ChatAssistantTextBody(
-                    text: text,
-                    markdownVariant: self.markdownVariant,
-                    includesThinking: self.showsAssistantTrace)
+                ChatAssistantTextBody(text: text, markdownVariant: self.markdownVariant)
             }
 
             if !self.inlineAttachments.isEmpty {
@@ -203,7 +197,7 @@ private struct ChatMessageBody: View {
                 }
             }
 
-            if self.showsAssistantTrace, !self.toolCalls.isEmpty {
+            if !self.toolCalls.isEmpty {
                 ForEach(self.toolCalls.indices, id: \.self) { idx in
                     ToolCallCard(
                         content: self.toolCalls[idx],
@@ -211,7 +205,7 @@ private struct ChatMessageBody: View {
                 }
             }
 
-            if self.showsAssistantTrace, !self.inlineToolResults.isEmpty {
+            if !self.inlineToolResults.isEmpty {
                 ForEach(self.inlineToolResults.indices, id: \.self) { idx in
                     let toolResult = self.inlineToolResults[idx]
                     let display = ToolDisplayRegistry.resolve(name: toolResult.name ?? "tool", args: nil)
@@ -516,14 +510,10 @@ private extension View {
 struct ChatStreamingAssistantBubble: View {
     let text: String
     let markdownVariant: ChatMarkdownVariant
-    let showsAssistantTrace: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ChatAssistantTextBody(
-                text: self.text,
-                markdownVariant: self.markdownVariant,
-                includesThinking: self.showsAssistantTrace)
+            ChatAssistantTextBody(text: self.text, markdownVariant: self.markdownVariant)
         }
         .padding(12)
         .assistantBubbleContainerStyle()
@@ -616,10 +606,9 @@ private struct TypingDots: View {
 private struct ChatAssistantTextBody: View {
     let text: String
     let markdownVariant: ChatMarkdownVariant
-    let includesThinking: Bool
 
     var body: some View {
-        let segments = AssistantTextParser.segments(from: self.text, includeThinking: self.includesThinking)
+        let segments = AssistantTextParser.segments(from: self.text)
         VStack(alignment: .leading, spacing: 10) {
             ForEach(segments) { segment in
                 let font = segment.kind == .thinking ? Font.system(size: 14).italic() : Font.system(size: 14)

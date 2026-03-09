@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   buildBaseAccountStatusSnapshot,
   buildBaseChannelStatusSummary,
-  buildComputedAccountStatusSnapshot,
-  buildRuntimeAccountStatusSnapshot,
   buildTokenChannelStatusSummary,
   collectStatusIssuesFromLastError,
   createDefaultChannelRuntimeState,
@@ -86,42 +84,6 @@ describe("buildBaseAccountStatusSnapshot", () => {
       probe: undefined,
       lastInboundAt: null,
       lastOutboundAt: null,
-    });
-  });
-});
-
-describe("buildComputedAccountStatusSnapshot", () => {
-  it("builds account status when configured is computed outside resolver", () => {
-    expect(
-      buildComputedAccountStatusSnapshot({
-        accountId: "default",
-        enabled: true,
-        configured: false,
-      }),
-    ).toEqual({
-      accountId: "default",
-      name: undefined,
-      enabled: true,
-      configured: false,
-      running: false,
-      lastStartAt: null,
-      lastStopAt: null,
-      lastError: null,
-      probe: undefined,
-      lastInboundAt: null,
-      lastOutboundAt: null,
-    });
-  });
-});
-
-describe("buildRuntimeAccountStatusSnapshot", () => {
-  it("builds runtime lifecycle fields with defaults", () => {
-    expect(buildRuntimeAccountStatusSnapshot({})).toEqual({
-      running: false,
-      lastStartAt: null,
-      lastStopAt: null,
-      lastError: null,
-      probe: undefined,
     });
   });
 });

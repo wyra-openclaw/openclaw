@@ -51,8 +51,8 @@ describe("nostr outbound cfg threading", () => {
           accountId: "default",
           enabled: true,
           configured: true,
-          privateKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", // pragma: allowlist secret
-          publicKey: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789", // pragma: allowlist secret
+          privateKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          publicKey: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
           relays: ["wss://relay.example.com"],
           config: {},
         },
@@ -63,7 +63,7 @@ describe("nostr outbound cfg threading", () => {
     const cfg = {
       channels: {
         nostr: {
-          privateKey: "resolved-nostr-private-key", // pragma: allowlist secret
+          privateKey: "resolved-nostr-private-key",
         },
       },
     };

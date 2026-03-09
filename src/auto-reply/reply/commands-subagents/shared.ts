@@ -18,7 +18,6 @@ import { parseDiscordTarget } from "../../../discord/targets.js";
 import { callGateway } from "../../../gateway/call.js";
 import { formatTimeAgo } from "../../../infra/format-time/format-relative.ts";
 import { parseAgentSessionKey } from "../../../routing/session-key.js";
-import { looksLikeSessionId } from "../../../sessions/session-id.js";
 import { extractTextFromChatContent } from "../../../shared/chat-content.js";
 import {
   formatDurationCompact,
@@ -75,6 +74,8 @@ export const ACTIONS = new Set([
 export const RECENT_WINDOW_MINUTES = 30;
 const SUBAGENT_TASK_PREVIEW_MAX = 110;
 export const STEER_ABORT_SETTLE_TIMEOUT_MS = 5_000;
+
+const SESSION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function compactLine(value: string) {
   return value.replace(/\s+/g, " ").trim();
@@ -344,7 +345,7 @@ export async function resolveFocusTargetSession(params: {
 
   const attempts: Array<Record<string, string>> = [];
   attempts.push({ key: token });
-  if (looksLikeSessionId(token)) {
+  if (SESSION_ID_RE.test(token)) {
     attempts.push({ sessionId: token });
   }
   attempts.push({ label: token });

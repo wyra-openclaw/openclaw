@@ -1,4 +1,3 @@
-import { parseFiniteNumber as parseFiniteNumberish } from "./parse-finite-number.js";
 import { PROVIDER_LABELS } from "./provider-usage.shared.js";
 import type { ProviderUsageSnapshot, UsageProviderId } from "./provider-usage.types.js";
 
@@ -18,7 +17,16 @@ export async function fetchJson(
 }
 
 export function parseFiniteNumber(value: unknown): number | undefined {
-  return parseFiniteNumberish(value);
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return undefined;
 }
 
 type BuildUsageHttpErrorSnapshotOptions = {

@@ -252,7 +252,7 @@ export function resolveGatewayAuth(params: {
     env,
     includeLegacyEnv: false,
     tokenPrecedence: "config-first",
-    passwordPrecedence: "config-first", // pragma: allowlist secret
+    passwordPrecedence: "config-first",
   });
   const token = resolvedCredentials.token;
   const password = resolvedCredentials.password;
@@ -291,10 +291,7 @@ export function resolveGatewayAuth(params: {
   };
 }
 
-export function assertGatewayAuthConfigured(
-  auth: ResolvedGatewayAuth,
-  rawAuthConfig?: GatewayAuthConfig | null,
-): void {
+export function assertGatewayAuthConfigured(auth: ResolvedGatewayAuth): void {
   if (auth.mode === "token" && !auth.token) {
     if (auth.allowTailscale) {
       return;
@@ -304,14 +301,6 @@ export function assertGatewayAuthConfigured(
     );
   }
   if (auth.mode === "password" && !auth.password) {
-    if (
-      rawAuthConfig?.password != null && // pragma: allowlist secret
-      typeof rawAuthConfig.password !== "string" // pragma: allowlist secret
-    ) {
-      throw new Error(
-        "gateway auth mode is password, but gateway.auth.password contains a provider reference object instead of a resolved string — bootstrap secrets (gateway.auth.password) must be plaintext strings or set via the OPENCLAW_GATEWAY_PASSWORD environment variable because the secrets provider system has not initialised yet at gateway startup", // pragma: allowlist secret
-      );
-    }
     throw new Error("gateway auth mode is password, but no password was configured");
   }
   if (auth.mode === "trusted-proxy") {
@@ -450,9 +439,7 @@ export async function authorizeGatewayConnect(
       return { ok: false, reason: "token_missing_config" };
     }
     if (!connectAuth?.token) {
-      // Don't burn rate-limit slots for missing credentials — the client
-      // simply hasn't provided a token yet (e.g. bare browser open).
-      // Only actual *wrong* credentials should count as failures.
+      limiter?.recordFailure(ip, rateLimitScope);
       return { ok: false, reason: "token_missing" };
     }
     if (!safeEqualSecret(connectAuth.token, auth.token)) {
@@ -469,7 +456,7 @@ export async function authorizeGatewayConnect(
       return { ok: false, reason: "password_missing_config" };
     }
     if (!password) {
-      // Same as token_missing — don't penalize absent credentials.
+      limiter?.recordFailure(ip, rateLimitScope);
       return { ok: false, reason: "password_missing" };
     }
     if (!safeEqualSecret(password, auth.password)) {

@@ -40,47 +40,37 @@ function resolveSendContext(options: ZaloSendOptions): {
   return { token, fetcher: resolveZaloProxyFetch(proxy) };
 }
 
-function resolveValidatedSendContext(
-  chatId: string,
-  options: ZaloSendOptions,
-): { ok: true; chatId: string; token: string; fetcher?: ZaloFetch } | { ok: false; error: string } {
-  const { token, fetcher } = resolveSendContext(options);
-  if (!token) {
-    return { ok: false, error: "No Zalo bot token configured" };
-  }
-  const trimmedChatId = chatId?.trim();
-  if (!trimmedChatId) {
-    return { ok: false, error: "No chat_id provided" };
-  }
-  return { ok: true, chatId: trimmedChatId, token, fetcher };
-}
-
 export async function sendMessageZalo(
   chatId: string,
   text: string,
   options: ZaloSendOptions = {},
 ): Promise<ZaloSendResult> {
-  const context = resolveValidatedSendContext(chatId, options);
-  if (!context.ok) {
-    return { ok: false, error: context.error };
+  const { token, fetcher } = resolveSendContext(options);
+
+  if (!token) {
+    return { ok: false, error: "No Zalo bot token configured" };
+  }
+
+  if (!chatId?.trim()) {
+    return { ok: false, error: "No chat_id provided" };
   }
 
   if (options.mediaUrl) {
-    return sendPhotoZalo(context.chatId, options.mediaUrl, {
+    return sendPhotoZalo(chatId, options.mediaUrl, {
       ...options,
-      token: context.token,
+      token,
       caption: text || options.caption,
     });
   }
 
   try {
     const response = await sendMessage(
-      context.token,
+      token,
       {
-        chat_id: context.chatId,
+        chat_id: chatId.trim(),
         text: text.slice(0, 2000),
       },
-      context.fetcher,
+      fetcher,
     );
 
     if (response.ok && response.result) {
@@ -98,9 +88,14 @@ export async function sendPhotoZalo(
   photoUrl: string,
   options: ZaloSendOptions = {},
 ): Promise<ZaloSendResult> {
-  const context = resolveValidatedSendContext(chatId, options);
-  if (!context.ok) {
-    return { ok: false, error: context.error };
+  const { token, fetcher } = resolveSendContext(options);
+
+  if (!token) {
+    return { ok: false, error: "No Zalo bot token configured" };
+  }
+
+  if (!chatId?.trim()) {
+    return { ok: false, error: "No chat_id provided" };
   }
 
   if (!photoUrl?.trim()) {
@@ -109,13 +104,13 @@ export async function sendPhotoZalo(
 
   try {
     const response = await sendPhoto(
-      context.token,
+      token,
       {
-        chat_id: context.chatId,
+        chat_id: chatId.trim(),
         photo: photoUrl.trim(),
         caption: options.caption?.slice(0, 2000),
       },
-      context.fetcher,
+      fetcher,
     );
 
     if (response.ok && response.result) {

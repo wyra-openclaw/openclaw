@@ -278,7 +278,6 @@ describe("sanitizeSystemRunParamsForForwarding", () => {
     const forwarded = result.params as Record<string, unknown>;
     expect(forwarded.command).toEqual(["/usr/bin/echo", "SAFE"]);
     expect(forwarded.rawCommand).toBe("/usr/bin/echo SAFE");
-    expect(forwarded.systemRunPlan).toEqual(record.request.systemRunPlan);
     expect(forwarded.cwd).toBe("/real/cwd");
     expect(forwarded.agentId).toBe("main");
     expect(forwarded.sessionKey).toBe("agent:main:main");

@@ -6,34 +6,28 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { OpenClawConfig, ReplyPayload, RuntimeEnv } from "openclaw/plugin-sdk/mattermost";
 import {
-  buildModelsProviderData,
   createReplyPrefixOptions,
   createTypingCallbacks,
+  isDangerousNameMatchingEnabled,
   logTypingFailure,
-  type OpenClawConfig,
-  type ReplyPayload,
-  type RuntimeEnv,
+  resolveControlCommandGate,
 } from "openclaw/plugin-sdk/mattermost";
 import type { ResolvedMattermostAccount } from "../mattermost/accounts.js";
 import { getMattermostRuntime } from "../runtime.js";
 import {
   createMattermostClient,
   fetchMattermostChannel,
+  fetchMattermostUser,
   normalizeMattermostBaseUrl,
   sendMattermostTyping,
   type MattermostChannel,
 } from "./client.js";
 import {
-  renderMattermostModelSummaryView,
-  renderMattermostModelsPickerView,
-  renderMattermostProviderPickerView,
-  resolveMattermostModelPickerCurrentModel,
-  resolveMattermostModelPickerEntry,
-} from "./model-picker.js";
-import {
-  authorizeMattermostCommandInvocation,
+  isMattermostSenderAllowed,
   normalizeMattermostAllowList,
+  resolveMattermostEffectiveAllowFromLists,
 } from "./monitor-auth.js";
 import { sendMessageMattermost } from "./send.js";
 import {
@@ -134,11 +128,29 @@ async function authorizeSlashInvocation(params: {
     };
   }
 
-  const allowTextCommands = core.channel.commands.shouldHandleTextCommands({
-    cfg,
-    surface: "mattermost",
-  });
-  const hasControlCommand = core.channel.text.hasControlCommand(commandText, cfg);
+  const channelType = channelInfo.type ?? undefined;
+  const isDirectMessage = channelType?.toUpperCase() === "D";
+  const kind: SlashInvocationAuth["kind"] = isDirectMessage
+    ? "direct"
+    : channelInfo
+      ? channelType?.toUpperCase() === "G"
+        ? "group"
+        : "channel"
+      : "channel";
+
+  const chatType = kind === "direct" ? "direct" : kind === "group" ? "group" : "channel";
+
+  const channelName = channelInfo?.name ?? "";
+  const channelDisplay = channelInfo?.display_name ?? channelName;
+  const roomLabel = channelName ? `#${channelName}` : channelDisplay || `#${channelId}`;
+
+  const dmPolicy = account.config.dmPolicy ?? "pairing";
+  const defaultGroupPolicy = cfg.channels?.defaults?.groupPolicy;
+  const groupPolicy = account.config.groupPolicy ?? defaultGroupPolicy ?? "allowlist";
+  const allowNameMatching = isDangerousNameMatchingEnabled(account.config);
+
+  const configAllowFrom = normalizeMattermostAllowList(account.config.allowFrom ?? []);
+  const configGroupAllowFrom = normalizeMattermostAllowList(account.config.groupAllowFrom ?? []);
   const storeAllowFrom = normalizeMattermostAllowList(
     await core.channel.pairing
       .readAllowFromStore({
@@ -147,61 +159,201 @@ async function authorizeSlashInvocation(params: {
       })
       .catch(() => []),
   );
-  const decision = authorizeMattermostCommandInvocation({
-    account,
+  const { effectiveAllowFrom, effectiveGroupAllowFrom } = resolveMattermostEffectiveAllowFromLists({
+    allowFrom: configAllowFrom,
+    groupAllowFrom: configGroupAllowFrom,
+    storeAllowFrom,
+    dmPolicy,
+  });
+
+  const allowTextCommands = core.channel.commands.shouldHandleTextCommands({
     cfg,
+    surface: "mattermost",
+  });
+  const hasControlCommand = core.channel.text.hasControlCommand(commandText, cfg);
+  const useAccessGroups = cfg.commands?.useAccessGroups !== false;
+  const commandDmAllowFrom = kind === "direct" ? effectiveAllowFrom : configAllowFrom;
+  const commandGroupAllowFrom =
+    kind === "direct"
+      ? effectiveGroupAllowFrom
+      : configGroupAllowFrom.length > 0
+        ? configGroupAllowFrom
+        : configAllowFrom;
+
+  const senderAllowedForCommands = isMattermostSenderAllowed({
     senderId,
     senderName,
-    channelId,
-    channelInfo,
-    storeAllowFrom,
+    allowFrom: commandDmAllowFrom,
+    allowNameMatching,
+  });
+  const groupAllowedForCommands = isMattermostSenderAllowed({
+    senderId,
+    senderName,
+    allowFrom: commandGroupAllowFrom,
+    allowNameMatching,
+  });
+
+  const commandGate = resolveControlCommandGate({
+    useAccessGroups,
+    authorizers: [
+      { configured: commandDmAllowFrom.length > 0, allowed: senderAllowedForCommands },
+      {
+        configured: commandGroupAllowFrom.length > 0,
+        allowed: groupAllowedForCommands,
+      },
+    ],
     allowTextCommands,
     hasControlCommand,
   });
 
-  if (!decision.ok) {
-    if (decision.denyReason === "dm-pairing") {
-      const { code } = await core.channel.pairing.upsertPairingRequest({
-        channel: "mattermost",
-        accountId: account.accountId,
-        id: senderId,
-        meta: { name: senderName },
-      });
+  const commandAuthorized =
+    kind === "direct"
+      ? dmPolicy === "open" || senderAllowedForCommands
+      : commandGate.commandAuthorized;
+
+  // DM policy enforcement
+  if (kind === "direct") {
+    if (dmPolicy === "disabled") {
       return {
-        ...decision,
+        ok: false,
         denyResponse: {
           response_type: "ephemeral",
-          text: core.channel.pairing.buildPairingReply({
-            channel: "mattermost",
-            idLine: `Your Mattermost user id: ${senderId}`,
-            code,
-          }),
+          text: "This bot is not accepting direct messages.",
         },
+        commandAuthorized: false,
+        channelInfo,
+        kind,
+        chatType,
+        channelName,
+        channelDisplay,
+        roomLabel,
       };
     }
 
-    const denyText =
-      decision.denyReason === "unknown-channel"
-        ? "Temporary error: unable to determine channel type. Please try again."
-        : decision.denyReason === "dm-disabled"
-          ? "This bot is not accepting direct messages."
-          : decision.denyReason === "channels-disabled"
-            ? "Slash commands are disabled in channels."
-            : decision.denyReason === "channel-no-allowlist"
-              ? "Slash commands are not configured for this channel (no allowlist)."
-              : "Unauthorized.";
-    return {
-      ...decision,
-      denyResponse: {
-        response_type: "ephemeral",
-        text: denyText,
-      },
-    };
+    if (dmPolicy !== "open" && !senderAllowedForCommands) {
+      if (dmPolicy === "pairing") {
+        const { code } = await core.channel.pairing.upsertPairingRequest({
+          channel: "mattermost",
+          accountId: account.accountId,
+          id: senderId,
+          meta: { name: senderName },
+        });
+        return {
+          ok: false,
+          denyResponse: {
+            response_type: "ephemeral",
+            text: core.channel.pairing.buildPairingReply({
+              channel: "mattermost",
+              idLine: `Your Mattermost user id: ${senderId}`,
+              code,
+            }),
+          },
+          commandAuthorized: false,
+          channelInfo,
+          kind,
+          chatType,
+          channelName,
+          channelDisplay,
+          roomLabel,
+        };
+      }
+
+      return {
+        ok: false,
+        denyResponse: {
+          response_type: "ephemeral",
+          text: "Unauthorized.",
+        },
+        commandAuthorized: false,
+        channelInfo,
+        kind,
+        chatType,
+        channelName,
+        channelDisplay,
+        roomLabel,
+      };
+    }
+  } else {
+    // Group/channel policy enforcement
+    if (groupPolicy === "disabled") {
+      return {
+        ok: false,
+        denyResponse: {
+          response_type: "ephemeral",
+          text: "Slash commands are disabled in channels.",
+        },
+        commandAuthorized: false,
+        channelInfo,
+        kind,
+        chatType,
+        channelName,
+        channelDisplay,
+        roomLabel,
+      };
+    }
+
+    if (groupPolicy === "allowlist") {
+      if (effectiveGroupAllowFrom.length === 0) {
+        return {
+          ok: false,
+          denyResponse: {
+            response_type: "ephemeral",
+            text: "Slash commands are not configured for this channel (no allowlist).",
+          },
+          commandAuthorized: false,
+          channelInfo,
+          kind,
+          chatType,
+          channelName,
+          channelDisplay,
+          roomLabel,
+        };
+      }
+      if (!groupAllowedForCommands) {
+        return {
+          ok: false,
+          denyResponse: {
+            response_type: "ephemeral",
+            text: "Unauthorized.",
+          },
+          commandAuthorized: false,
+          channelInfo,
+          kind,
+          chatType,
+          channelName,
+          channelDisplay,
+          roomLabel,
+        };
+      }
+    }
+
+    if (commandGate.shouldBlock) {
+      return {
+        ok: false,
+        denyResponse: {
+          response_type: "ephemeral",
+          text: "Unauthorized.",
+        },
+        commandAuthorized: false,
+        channelInfo,
+        kind,
+        chatType,
+        channelName,
+        channelDisplay,
+        roomLabel,
+      };
+    }
   }
 
   return {
-    ...decision,
-    denyResponse: undefined,
+    ok: true,
+    commandAuthorized,
+    channelInfo,
+    kind,
+    chatType,
+    channelName,
+    channelDisplay,
+    roomLabel,
   };
 }
 
@@ -385,48 +537,6 @@ async function handleSlashCommandAsync(params: {
       : `Mattermost message in ${roomLabel} from ${senderName}`;
 
   const to = kind === "direct" ? `user:${senderId}` : `channel:${channelId}`;
-  const pickerEntry = resolveMattermostModelPickerEntry(commandText);
-  if (pickerEntry) {
-    const data = await buildModelsProviderData(cfg, route.agentId);
-    if (data.providers.length === 0) {
-      await sendMessageMattermost(to, "No models available.", {
-        accountId: account.accountId,
-      });
-      return;
-    }
-
-    const currentModel = resolveMattermostModelPickerCurrentModel({
-      cfg,
-      route,
-      data,
-    });
-    const view =
-      pickerEntry.kind === "summary"
-        ? renderMattermostModelSummaryView({
-            ownerUserId: senderId,
-            currentModel,
-          })
-        : pickerEntry.kind === "providers"
-          ? renderMattermostProviderPickerView({
-              ownerUserId: senderId,
-              data,
-              currentModel,
-            })
-          : renderMattermostModelsPickerView({
-              ownerUserId: senderId,
-              data,
-              provider: pickerEntry.provider,
-              page: 1,
-              currentModel,
-            });
-
-    await sendMessageMattermost(to, view.text, {
-      accountId: account.accountId,
-      buttons: view.buttons,
-    });
-    runtime.log?.(`delivered model picker to ${to}`);
-    return;
-  }
 
   // Build inbound context — the command text is the body
   const ctxPayload = core.channel.reply.finalizeInboundContext({

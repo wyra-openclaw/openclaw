@@ -12,51 +12,26 @@ vi.mock("./api.js", () => ({
 import { googlechatPlugin } from "./channel.js";
 import { setGoogleChatRuntime } from "./runtime.js";
 
-function createGoogleChatCfg(): OpenClawConfig {
-  return {
-    channels: {
-      googlechat: {
-        enabled: true,
-        serviceAccount: {
-          type: "service_account",
-          client_email: "bot@example.com",
-          private_key: "test-key", // pragma: allowlist secret
-          token_uri: "https://oauth2.googleapis.com/token",
-        },
-      },
-    },
-  };
-}
-
-function setupRuntimeMediaMocks(params: { loadFileName: string; loadBytes: string }) {
-  const loadWebMedia = vi.fn(async () => ({
-    buffer: Buffer.from(params.loadBytes),
-    fileName: params.loadFileName,
-    contentType: "image/png",
-  }));
-  const fetchRemoteMedia = vi.fn(async () => ({
-    buffer: Buffer.from("remote-bytes"),
-    fileName: "remote.png",
-    contentType: "image/png",
-  }));
-
-  setGoogleChatRuntime({
-    media: { loadWebMedia },
-    channel: {
-      media: { fetchRemoteMedia },
-      text: { chunkMarkdownText: (text: string) => [text] },
-    },
-  } as unknown as PluginRuntime);
-
-  return { loadWebMedia, fetchRemoteMedia };
-}
-
 describe("googlechatPlugin outbound sendMedia", () => {
   it("loads local media with mediaLocalRoots via runtime media loader", async () => {
-    const { loadWebMedia, fetchRemoteMedia } = setupRuntimeMediaMocks({
-      loadFileName: "image.png",
-      loadBytes: "image-bytes",
-    });
+    const loadWebMedia = vi.fn(async () => ({
+      buffer: Buffer.from("image-bytes"),
+      fileName: "image.png",
+      contentType: "image/png",
+    }));
+    const fetchRemoteMedia = vi.fn(async () => ({
+      buffer: Buffer.from("remote-bytes"),
+      fileName: "remote.png",
+      contentType: "image/png",
+    }));
+
+    setGoogleChatRuntime({
+      media: { loadWebMedia },
+      channel: {
+        media: { fetchRemoteMedia },
+        text: { chunkMarkdownText: (text: string) => [text] },
+      },
+    } as unknown as PluginRuntime);
 
     uploadGoogleChatAttachmentMock.mockResolvedValue({
       attachmentUploadToken: "token-1",
@@ -65,7 +40,19 @@ describe("googlechatPlugin outbound sendMedia", () => {
       messageName: "spaces/AAA/messages/msg-1",
     });
 
-    const cfg = createGoogleChatCfg();
+    const cfg: OpenClawConfig = {
+      channels: {
+        googlechat: {
+          enabled: true,
+          serviceAccount: {
+            type: "service_account",
+            client_email: "bot@example.com",
+            private_key: "test-key",
+            token_uri: "https://oauth2.googleapis.com/token",
+          },
+        },
+      },
+    };
 
     const result = await googlechatPlugin.outbound?.sendMedia?.({
       cfg,
@@ -104,10 +91,24 @@ describe("googlechatPlugin outbound sendMedia", () => {
   });
 
   it("keeps remote URL media fetch on fetchRemoteMedia with maxBytes cap", async () => {
-    const { loadWebMedia, fetchRemoteMedia } = setupRuntimeMediaMocks({
-      loadFileName: "unused.png",
-      loadBytes: "should-not-be-used",
-    });
+    const loadWebMedia = vi.fn(async () => ({
+      buffer: Buffer.from("should-not-be-used"),
+      fileName: "unused.png",
+      contentType: "image/png",
+    }));
+    const fetchRemoteMedia = vi.fn(async () => ({
+      buffer: Buffer.from("remote-bytes"),
+      fileName: "remote.png",
+      contentType: "image/png",
+    }));
+
+    setGoogleChatRuntime({
+      media: { loadWebMedia },
+      channel: {
+        media: { fetchRemoteMedia },
+        text: { chunkMarkdownText: (text: string) => [text] },
+      },
+    } as unknown as PluginRuntime);
 
     uploadGoogleChatAttachmentMock.mockResolvedValue({
       attachmentUploadToken: "token-2",
@@ -116,7 +117,19 @@ describe("googlechatPlugin outbound sendMedia", () => {
       messageName: "spaces/AAA/messages/msg-2",
     });
 
-    const cfg = createGoogleChatCfg();
+    const cfg: OpenClawConfig = {
+      channels: {
+        googlechat: {
+          enabled: true,
+          serviceAccount: {
+            type: "service_account",
+            client_email: "bot@example.com",
+            private_key: "test-key",
+            token_uri: "https://oauth2.googleapis.com/token",
+          },
+        },
+      },
+    };
 
     const result = await googlechatPlugin.outbound?.sendMedia?.({
       cfg,

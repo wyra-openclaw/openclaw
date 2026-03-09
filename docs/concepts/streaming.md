@@ -138,7 +138,7 @@ Legacy key migration:
 
 Telegram:
 
-- Uses `sendMessage` + `editMessageText` preview updates across DMs and group/topics.
+- Uses Bot API `sendMessageDraft` in DMs when available, and `sendMessage` + `editMessageText` for group/topic preview updates.
 - Preview streaming is skipped when Telegram block streaming is explicitly enabled (to avoid double-streaming).
 - `/reasoning stream` can write reasoning to preview.
 

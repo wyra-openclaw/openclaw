@@ -65,7 +65,6 @@ export function createBlockReplyDeliveryHandler(params: {
   currentMessageId?: string;
   normalizeStreamingText: (payload: ReplyPayload) => { text?: string; skip: boolean };
   applyReplyToMode: (payload: ReplyPayload) => ReplyPayload;
-  normalizeMediaPaths?: (payload: ReplyPayload) => Promise<ReplyPayload>;
   typingSignals: TypingSignaler;
   blockStreamingEnabled: boolean;
   blockReplyPipeline: BlockReplyPipeline | null;
@@ -102,10 +101,7 @@ export function createBlockReplyDeliveryHandler(params: {
       parseMode: "auto",
     });
 
-    const mediaNormalizedPayload = params.normalizeMediaPaths
-      ? await params.normalizeMediaPaths(normalized.payload)
-      : normalized.payload;
-    const blockPayload = params.applyReplyToMode(mediaNormalizedPayload);
+    const blockPayload = params.applyReplyToMode(normalized.payload);
     const blockHasMedia = hasRenderableMedia(blockPayload);
 
     // Skip empty payloads unless they have audioAsVoice flag (need to track it).

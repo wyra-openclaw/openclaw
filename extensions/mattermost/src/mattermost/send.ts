@@ -13,12 +13,6 @@ import {
   uploadMattermostFile,
   type MattermostUser,
 } from "./client.js";
-import {
-  buildButtonProps,
-  resolveInteractionCallbackUrl,
-  setInteractionSecret,
-  type MattermostInteractiveButtonInput,
-} from "./interactions.js";
 
 export type MattermostSendOpts = {
   cfg?: OpenClawConfig;
@@ -29,18 +23,12 @@ export type MattermostSendOpts = {
   mediaLocalRoots?: readonly string[];
   replyToId?: string;
   props?: Record<string, unknown>;
-  buttons?: Array<unknown>;
-  attachmentText?: string;
 };
 
 export type MattermostSendResult = {
   messageId: string;
   channelId: string;
 };
-
-export type MattermostReplyButtons = Array<
-  MattermostInteractiveButtonInput | MattermostInteractiveButtonInput[]
->;
 
 type MattermostTarget =
   | { kind: "channel"; id: string }
@@ -217,19 +205,13 @@ async function resolveTargetChannelId(params: {
   return channel.id;
 }
 
-type MattermostSendContext = {
-  cfg: OpenClawConfig;
-  accountId: string;
-  token: string;
-  baseUrl: string;
-  channelId: string;
-};
-
-async function resolveMattermostSendContext(
+export async function sendMessageMattermost(
   to: string,
+  text: string,
   opts: MattermostSendOpts = {},
-): Promise<MattermostSendContext> {
+): Promise<MattermostSendResult> {
   const core = getCore();
+  const logger = core.logging.getChildLogger({ module: "mattermost" });
   const cfg = opts.cfg ?? core.config.loadConfig();
   const account = resolveMattermostAccount({
     cfg,
@@ -255,52 +237,7 @@ async function resolveMattermostSendContext(
     token,
   });
 
-  return {
-    cfg,
-    accountId: account.accountId,
-    token,
-    baseUrl,
-    channelId,
-  };
-}
-
-export async function resolveMattermostSendChannelId(
-  to: string,
-  opts: MattermostSendOpts = {},
-): Promise<string> {
-  return (await resolveMattermostSendContext(to, opts)).channelId;
-}
-
-export async function sendMessageMattermost(
-  to: string,
-  text: string,
-  opts: MattermostSendOpts = {},
-): Promise<MattermostSendResult> {
-  const core = getCore();
-  const logger = core.logging.getChildLogger({ module: "mattermost" });
-  const { cfg, accountId, token, baseUrl, channelId } = await resolveMattermostSendContext(
-    to,
-    opts,
-  );
-
   const client = createMattermostClient({ baseUrl, botToken: token });
-  let props = opts.props;
-  if (!props && Array.isArray(opts.buttons) && opts.buttons.length > 0) {
-    setInteractionSecret(accountId, token);
-    props = buildButtonProps({
-      callbackUrl: resolveInteractionCallbackUrl(accountId, {
-        gateway: cfg.gateway,
-        interactions: resolveMattermostAccount({
-          cfg,
-          accountId,
-        }).config?.interactions,
-      }),
-      accountId,
-      channelId,
-      buttons: opts.buttons,
-      text: opts.attachmentText,
-    });
-  }
   let message = text?.trim() ?? "";
   let fileIds: string[] | undefined;
   let uploadError: Error | undefined;
@@ -332,7 +269,7 @@ export async function sendMessageMattermost(
     const tableMode = core.channel.text.resolveMarkdownTableMode({
       cfg,
       channel: "mattermost",
-      accountId,
+      accountId: account.accountId,
     });
     message = core.channel.text.convertMarkdownTables(message, tableMode);
   }
@@ -349,12 +286,12 @@ export async function sendMessageMattermost(
     message,
     rootId: opts.replyToId,
     fileIds,
-    props,
+    props: opts.props,
   });
 
   core.channel.activity.record({
     channel: "mattermost",
-    accountId,
+    accountId: account.accountId,
     direction: "outbound",
   });
 

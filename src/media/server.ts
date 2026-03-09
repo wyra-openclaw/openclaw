@@ -96,7 +96,7 @@ export function attachMediaRoutes(
 
   // periodic cleanup
   setInterval(() => {
-    void cleanOldMedia(ttlMs, { recursive: false });
+    void cleanOldMedia(ttlMs);
   }, ttlMs).unref();
 }
 

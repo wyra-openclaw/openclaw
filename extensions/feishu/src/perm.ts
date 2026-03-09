@@ -3,11 +3,15 @@ import type { OpenClawPluginApi } from "openclaw/plugin-sdk/feishu";
 import { listEnabledFeishuAccounts } from "./accounts.js";
 import { FeishuPermSchema, type FeishuPermParams } from "./perm-schema.js";
 import { createFeishuToolClient, resolveAnyEnabledFeishuToolsConfig } from "./tool-account.js";
-import {
-  jsonToolResult,
-  toolExecutionErrorResult,
-  unknownToolActionResult,
-} from "./tool-result.js";
+
+// ============ Helpers ============
+
+function json(data: unknown) {
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+    details: data,
+  };
+}
 
 type ListTokenType =
   | "doc"
@@ -150,21 +154,21 @@ export function registerFeishuPermTools(api: OpenClawPluginApi) {
             });
             switch (p.action) {
               case "list":
-                return jsonToolResult(await listMembers(client, p.token, p.type));
+                return json(await listMembers(client, p.token, p.type));
               case "add":
-                return jsonToolResult(
+                return json(
                   await addMember(client, p.token, p.type, p.member_type, p.member_id, p.perm),
                 );
               case "remove":
-                return jsonToolResult(
+                return json(
                   await removeMember(client, p.token, p.type, p.member_type, p.member_id),
                 );
               default:
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- exhaustive check fallback
-                return unknownToolActionResult((p as { action?: unknown }).action);
+                return json({ error: `Unknown action: ${(p as any).action}` });
             }
           } catch (err) {
-            return toolExecutionErrorResult(err);
+            return json({ error: err instanceof Error ? err.message : String(err) });
           }
         },
       };

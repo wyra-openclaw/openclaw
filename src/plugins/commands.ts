@@ -316,32 +316,16 @@ export function listPluginCommands(): Array<{
   }));
 }
 
-function resolvePluginNativeName(
-  command: OpenClawPluginCommandDefinition,
-  provider?: string,
-): string {
-  const providerName = provider?.trim().toLowerCase();
-  const providerOverride = providerName ? command.nativeNames?.[providerName] : undefined;
-  if (typeof providerOverride === "string" && providerOverride.trim()) {
-    return providerOverride.trim();
-  }
-  const defaultOverride = command.nativeNames?.default;
-  if (typeof defaultOverride === "string" && defaultOverride.trim()) {
-    return defaultOverride.trim();
-  }
-  return command.name;
-}
-
 /**
  * Get plugin command specs for native command registration (e.g., Telegram).
  */
-export function getPluginCommandSpecs(provider?: string): Array<{
+export function getPluginCommandSpecs(): Array<{
   name: string;
   description: string;
   acceptsArgs: boolean;
 }> {
   return Array.from(pluginCommands.values()).map((cmd) => ({
-    name: resolvePluginNativeName(cmd, provider),
+    name: cmd.name,
     description: cmd.description,
     acceptsArgs: cmd.acceptsArgs ?? false,
   }));

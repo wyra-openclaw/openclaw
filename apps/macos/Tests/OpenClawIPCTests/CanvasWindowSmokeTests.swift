@@ -7,7 +7,7 @@ import Testing
 @Suite(.serialized)
 @MainActor
 struct CanvasWindowSmokeTests {
-    @Test func `panel controller shows and hides`() async throws {
+    @Test func panelControllerShowsAndHides() async throws {
         let root = FileManager().temporaryDirectory
             .appendingPathComponent("openclaw-canvas-test-\(UUID().uuidString)")
         try FileManager().createDirectory(at: root, withIntermediateDirectories: true)
@@ -30,7 +30,7 @@ struct CanvasWindowSmokeTests {
         controller.close()
     }
 
-    @Test func `window controller shows and closes`() throws {
+    @Test func windowControllerShowsAndCloses() throws {
         let root = FileManager().temporaryDirectory
             .appendingPathComponent("openclaw-canvas-test-\(UUID().uuidString)")
         try FileManager().createDirectory(at: root, withIntermediateDirectories: true)

@@ -115,7 +115,7 @@ describe("DiscordMessageListener", () => {
     expect(handlerResolved).toBe(true);
   });
 
-  it("dispatches subsequent events concurrently without blocking on prior handler", async () => {
+  it("queues subsequent events until prior message handling completes", async () => {
     const first = createDeferred();
     const second = createDeferred();
     let runCount = 0;
@@ -142,12 +142,12 @@ describe("DiscordMessageListener", () => {
       ),
     ).resolves.toBeUndefined();
 
-    // Both handlers are dispatched concurrently (fire-and-forget).
+    expect(handler).toHaveBeenCalledTimes(1);
+    first.resolve();
     await vi.waitFor(() => {
       expect(handler).toHaveBeenCalledTimes(2);
     });
 
-    first.resolve();
     second.resolve();
     await Promise.resolve();
   });
@@ -171,28 +171,42 @@ describe("DiscordMessageListener", () => {
     });
   });
 
-  it("does not apply its own slow-listener logging (owned by inbound worker)", async () => {
-    const deferred = createDeferred();
-    const handler = vi.fn(() => deferred.promise);
-    const logger = {
-      warn: vi.fn(),
-      error: vi.fn(),
-    } as unknown as ReturnType<typeof import("../logging/subsystem.js").createSubsystemLogger>;
-    const listener = new DiscordMessageListener(handler, logger);
+  it("logs slow handlers after the threshold", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
 
-    const handlePromise = listener.handle(
-      {} as unknown as import("./monitor/listeners.js").DiscordMessageEvent,
-      {} as unknown as import("@buape/carbon").Client,
-    );
-    await expect(handlePromise).resolves.toBeUndefined();
+    try {
+      const deferred = createDeferred();
+      const handler = vi.fn(() => deferred.promise);
+      const logger = {
+        warn: vi.fn(),
+        error: vi.fn(),
+      } as unknown as ReturnType<typeof import("../logging/subsystem.js").createSubsystemLogger>;
+      const listener = new DiscordMessageListener(handler, logger);
 
-    deferred.resolve();
-    await vi.waitFor(() => {
-      expect(handler).toHaveBeenCalledOnce();
-    });
-    // The listener no longer wraps handlers with slow-listener logging;
-    // that responsibility moved to the inbound worker.
-    expect(logger.warn).not.toHaveBeenCalled();
+      // handle() should release immediately.
+      const handlePromise = listener.handle(
+        {} as unknown as import("./monitor/listeners.js").DiscordMessageEvent,
+        {} as unknown as import("@buape/carbon").Client,
+      );
+      await expect(handlePromise).resolves.toBeUndefined();
+      expect(logger.warn).not.toHaveBeenCalled();
+
+      // Advance wall clock past the slow listener threshold.
+      vi.setSystemTime(31_000);
+
+      // Release the background handler and allow slow-log finalizer to run.
+      deferred.resolve();
+      await vi.waitFor(() => {
+        expect(logger.warn).toHaveBeenCalled();
+      });
+      const warnMock = logger.warn as unknown as { mock: { calls: unknown[][] } };
+      const [, meta] = warnMock.mock.calls[0] ?? [];
+      const durationMs = (meta as { durationMs?: number } | undefined)?.durationMs;
+      expect(durationMs).toBeGreaterThanOrEqual(30_000);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

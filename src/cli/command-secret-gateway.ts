@@ -25,7 +25,7 @@ type ResolveCommandSecretsResult = {
   hadUnresolvedTargets: boolean;
 };
 
-export type CommandSecretResolutionMode = "strict" | "summary" | "operational_readonly"; // pragma: allowlist secret
+export type CommandSecretResolutionMode = "strict" | "summary" | "operational_readonly";
 
 export type CommandSecretTargetState =
   | "resolved_gateway"
@@ -396,7 +396,6 @@ export async function resolveCommandSecretRefsViaGateway(params: {
   let payload: GatewaySecretsResolveResult;
   try {
     payload = await callGateway<GatewaySecretsResolveResult>({
-      config: params.config,
       method: "secrets.resolve",
       requiredMethods: ["secrets.resolve"],
       params: {

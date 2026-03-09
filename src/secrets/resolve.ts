@@ -127,33 +127,6 @@ function refResolutionError(params: {
   return new SecretRefResolutionError(params);
 }
 
-function throwUnknownProviderResolutionError(params: {
-  source: SecretRefSource;
-  provider: string;
-  err: unknown;
-}): never {
-  if (isSecretResolutionError(params.err)) {
-    throw params.err;
-  }
-  throw providerResolutionError({
-    source: params.source,
-    provider: params.provider,
-    message: describeUnknownError(params.err),
-    cause: params.err,
-  });
-}
-
-async function readFileStatOrThrow(pathname: string, label: string) {
-  const stat = await safeStat(pathname);
-  if (!stat.ok) {
-    throw new Error(`${label} is not readable: ${pathname}`);
-  }
-  if (stat.isDir) {
-    throw new Error(`${label} must be a file: ${pathname}`);
-  }
-  return stat;
-}
-
 function isAbsolutePathname(value: string): boolean {
   return (
     path.isAbsolute(value) ||
@@ -216,7 +189,13 @@ async function assertSecurePath(params: {
   }
 
   let effectivePath = params.targetPath;
-  let stat = await readFileStatOrThrow(effectivePath, params.label);
+  let stat = await safeStat(effectivePath);
+  if (!stat.ok) {
+    throw new Error(`${params.label} is not readable: ${effectivePath}`);
+  }
+  if (stat.isDir) {
+    throw new Error(`${params.label} must be a file: ${effectivePath}`);
+  }
   if (stat.isSymlink) {
     if (!params.allowSymlinkPath) {
       throw new Error(`${params.label} must not be a symlink: ${effectivePath}`);
@@ -229,7 +208,13 @@ async function assertSecurePath(params: {
     if (!isAbsolutePathname(effectivePath)) {
       throw new Error(`${params.label} resolved symlink target must be an absolute path.`);
     }
-    stat = await readFileStatOrThrow(effectivePath, params.label);
+    stat = await safeStat(effectivePath);
+    if (!stat.ok) {
+      throw new Error(`${params.label} is not readable: ${effectivePath}`);
+    }
+    if (stat.isDir) {
+      throw new Error(`${params.label} must be a file: ${effectivePath}`);
+    }
     if (stat.isSymlink) {
       throw new Error(`${params.label} symlink target must not be a symlink: ${effectivePath}`);
     }
@@ -387,10 +372,14 @@ async function resolveFileRefs(params: {
       cache: params.cache,
     });
   } catch (err) {
-    throwUnknownProviderResolutionError({
+    if (isSecretResolutionError(err)) {
+      throw err;
+    }
+    throw providerResolutionError({
       source: "file",
       provider: params.providerName,
-      err,
+      message: describeUnknownError(err),
+      cause: err,
     });
   }
   const mode = params.providerConfig.mode ?? "json";
@@ -675,10 +664,14 @@ async function resolveExecRefs(params: {
       allowSymlinkPath: params.providerConfig.allowSymlinkCommand,
     });
   } catch (err) {
-    throwUnknownProviderResolutionError({
+    if (isSecretResolutionError(err)) {
+      throw err;
+    }
+    throw providerResolutionError({
       source: "exec",
       provider: params.providerName,
-      err,
+      message: describeUnknownError(err),
+      cause: err,
     });
   }
 
@@ -731,10 +724,14 @@ async function resolveExecRefs(params: {
       maxOutputBytes,
     });
   } catch (err) {
-    throwUnknownProviderResolutionError({
+    if (isSecretResolutionError(err)) {
+      throw err;
+    }
+    throw providerResolutionError({
       source: "exec",
       provider: params.providerName,
-      err,
+      message: describeUnknownError(err),
+      cause: err,
     });
   }
   if (result.termination === "timeout") {
@@ -768,10 +765,14 @@ async function resolveExecRefs(params: {
       jsonOnly,
     });
   } catch (err) {
-    throwUnknownProviderResolutionError({
+    if (isSecretResolutionError(err)) {
+      throw err;
+    }
+    throw providerResolutionError({
       source: "exec",
       provider: params.providerName,
-      err,
+      message: describeUnknownError(err),
+      cause: err,
     });
   }
   const resolved = new Map<string, unknown>();
@@ -821,10 +822,14 @@ async function resolveProviderRefs(params: {
       message: `Unsupported secret provider source "${String((params.providerConfig as { source?: unknown }).source)}".`,
     });
   } catch (err) {
-    throwUnknownProviderResolutionError({
+    if (isSecretResolutionError(err)) {
+      throw err;
+    }
+    throw providerResolutionError({
       source: params.source,
       provider: params.providerName,
-      err,
+      message: describeUnknownError(err),
+      cause: err,
     });
   }
 }

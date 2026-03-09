@@ -4,7 +4,6 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { OpenClawConfig } from "../../config/config.js";
 import { clearPluginManifestRegistryCache } from "../../plugins/manifest-registry.js";
-import { writePluginWithSkill } from "../test-helpers/skill-plugin-fixtures.js";
 import { resolveEmbeddedRunSkillEntries } from "./skills-runtime.js";
 
 const tempDirs: string[] = [];
@@ -21,12 +20,26 @@ async function setupBundledDiffsPlugin() {
   const workspaceDir = await createTempDir("openclaw-workspace-");
   const pluginRoot = path.join(bundledPluginsDir, "diffs");
 
-  await writePluginWithSkill({
-    pluginRoot,
-    pluginId: "diffs",
-    skillId: "diffs",
-    skillDescription: "runtime integration test",
-  });
+  await fs.mkdir(path.join(pluginRoot, "skills", "diffs"), { recursive: true });
+  await fs.writeFile(
+    path.join(pluginRoot, "openclaw.plugin.json"),
+    JSON.stringify(
+      {
+        id: "diffs",
+        skills: ["./skills"],
+        configSchema: { type: "object", additionalProperties: false, properties: {} },
+      },
+      null,
+      2,
+    ),
+    "utf-8",
+  );
+  await fs.writeFile(path.join(pluginRoot, "index.ts"), "export {};\n", "utf-8");
+  await fs.writeFile(
+    path.join(pluginRoot, "skills", "diffs", "SKILL.md"),
+    `---\nname: diffs\ndescription: runtime integration test\n---\n`,
+    "utf-8",
+  );
 
   return { bundledPluginsDir, workspaceDir };
 }

@@ -3,6 +3,7 @@ import OpenClawDiscovery
 import Testing
 @testable import OpenClaw
 
+@Suite
 struct GatewayDiscoveryHelpersTests {
     private func makeGateway(
         serviceHost: String?,
@@ -40,23 +41,23 @@ struct GatewayDiscoveryHelpersTests {
         #expect(parsed?.port == port)
     }
 
-    @Test func `ssh target uses resolved service host only`() {
+    @Test func sshTargetUsesResolvedServiceHostOnly() {
         let gateway = self.makeGateway(
             serviceHost: "resolved.example.ts.net",
             servicePort: 18789,
             sshPort: 2201)
-        self.assertSSHTarget(for: gateway, host: "resolved.example.ts.net", port: 2201)
+        assertSSHTarget(for: gateway, host: "resolved.example.ts.net", port: 2201)
     }
 
-    @Test func `ssh target allows missing resolved service port`() {
+    @Test func sshTargetAllowsMissingResolvedServicePort() {
         let gateway = self.makeGateway(
             serviceHost: "resolved.example.ts.net",
             servicePort: nil,
             sshPort: 2201)
-        self.assertSSHTarget(for: gateway, host: "resolved.example.ts.net", port: 2201)
+        assertSSHTarget(for: gateway, host: "resolved.example.ts.net", port: 2201)
     }
 
-    @Test func `ssh target rejects txt only gateways`() {
+    @Test func sshTargetRejectsTxtOnlyGateways() {
         let gateway = self.makeGateway(
             serviceHost: nil,
             servicePort: nil,
@@ -67,7 +68,7 @@ struct GatewayDiscoveryHelpersTests {
         #expect(GatewayDiscoveryHelpers.sshTarget(for: gateway) == nil)
     }
 
-    @Test func `direct url uses resolved service endpoint only`() {
+    @Test func directUrlUsesResolvedServiceEndpointOnly() {
         let tlsGateway = self.makeGateway(
             serviceHost: "resolved.example.ts.net",
             servicePort: 443)
@@ -84,7 +85,7 @@ struct GatewayDiscoveryHelpersTests {
         #expect(GatewayDiscoveryHelpers.directUrl(for: localGateway) == "ws://127.0.0.1:18789")
     }
 
-    @Test func `direct url rejects txt only fallback`() {
+    @Test func directUrlRejectsTxtOnlyFallback() {
         let gateway = self.makeGateway(
             serviceHost: nil,
             servicePort: nil,

@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  formatAllowFromLowercase,
-  formatNormalizedAllowFromEntries,
-  isAllowedParsedChatSender,
-  isNormalizedSenderAllowed,
-} from "./allow-from.js";
+import { isAllowedParsedChatSender, isNormalizedSenderAllowed } from "./allow-from.js";
 
 function parseAllowTarget(
   entry: string,
@@ -105,36 +100,5 @@ describe("isNormalizedSenderAllowed", () => {
         stripPrefixRe: /^(zalo|zl):/i,
       }),
     ).toBe(false);
-  });
-});
-
-describe("formatAllowFromLowercase", () => {
-  it("trims, strips prefixes, and lowercases entries", () => {
-    expect(
-      formatAllowFromLowercase({
-        allowFrom: [" Telegram:UserA ", "tg:UserB", "  "],
-        stripPrefixRe: /^(telegram|tg):/i,
-      }),
-    ).toEqual(["usera", "userb"]);
-  });
-});
-
-describe("formatNormalizedAllowFromEntries", () => {
-  it("applies custom normalization after trimming", () => {
-    expect(
-      formatNormalizedAllowFromEntries({
-        allowFrom: ["  @Alice ", "", " @Bob "],
-        normalizeEntry: (entry) => entry.replace(/^@/, "").toLowerCase(),
-      }),
-    ).toEqual(["alice", "bob"]);
-  });
-
-  it("filters empty normalized entries", () => {
-    expect(
-      formatNormalizedAllowFromEntries({
-        allowFrom: ["@", "valid"],
-        normalizeEntry: (entry) => entry.replace(/^@$/, ""),
-      }),
-    ).toEqual(["valid"]);
   });
 });

@@ -237,7 +237,6 @@ describe("createWebhookHandler", () => {
         body: "Hello from json",
         from: "123",
         senderName: "json-user",
-        commandAuthorized: true,
       }),
     );
   });
@@ -397,7 +396,6 @@ describe("createWebhookHandler", () => {
         senderName: "testuser",
         provider: "synology-chat",
         chatType: "direct",
-        commandAuthorized: true,
       }),
     );
   });
@@ -424,7 +422,6 @@ describe("createWebhookHandler", () => {
     expect(deliver).toHaveBeenCalledWith(
       expect.objectContaining({
         body: expect.stringContaining("[FILTERED]"),
-        commandAuthorized: true,
       }),
     );
   });

@@ -10,63 +10,6 @@ function expectedContainer(nextSegment: string): "array" | "object" {
   return isArrayIndexSegment(nextSegment) ? "array" : "object";
 }
 
-function parseArrayLeafTarget(
-  cursor: unknown,
-  leaf: string,
-  segments: string[],
-): { array: unknown[]; index: number } | null {
-  if (!Array.isArray(cursor)) {
-    return null;
-  }
-  if (!isArrayIndexSegment(leaf)) {
-    throw new Error(`Invalid array index segment "${leaf}" at ${segments.join(".")}.`);
-  }
-  return { array: cursor, index: Number.parseInt(leaf, 10) };
-}
-
-function traverseToLeafParent(params: {
-  root: unknown;
-  segments: string[];
-  requireExistingSegment: boolean;
-}): unknown {
-  if (params.segments.length === 0) {
-    throw new Error("Target path is empty.");
-  }
-
-  let cursor: unknown = params.root;
-  for (let index = 0; index < params.segments.length - 1; index += 1) {
-    const segment = params.segments[index] ?? "";
-    if (Array.isArray(cursor)) {
-      if (!isArrayIndexSegment(segment)) {
-        throw new Error(
-          `Invalid array index segment "${segment}" at ${params.segments.join(".")}.`,
-        );
-      }
-      const arrayIndex = Number.parseInt(segment, 10);
-      if (params.requireExistingSegment && (arrayIndex < 0 || arrayIndex >= cursor.length)) {
-        throw new Error(
-          `Path segment does not exist at ${params.segments.slice(0, index + 1).join(".")}.`,
-        );
-      }
-      cursor = cursor[arrayIndex];
-      continue;
-    }
-
-    if (!isRecord(cursor)) {
-      throw new Error(
-        `Invalid path shape at ${params.segments.slice(0, index).join(".") || "<root>"}.`,
-      );
-    }
-    if (params.requireExistingSegment && !Object.prototype.hasOwnProperty.call(cursor, segment)) {
-      throw new Error(
-        `Path segment does not exist at ${params.segments.slice(0, index + 1).join(".")}.`,
-      );
-    }
-    cursor = cursor[segment];
-  }
-  return cursor;
-}
-
 export function getPath(root: unknown, segments: string[]): unknown {
   if (segments.length === 0) {
     return undefined;
@@ -134,10 +77,13 @@ export function setPathCreateStrict(
   }
 
   const leaf = segments[segments.length - 1] ?? "";
-  const arrayTarget = parseArrayLeafTarget(cursor, leaf, segments);
-  if (arrayTarget) {
-    if (!isDeepStrictEqual(arrayTarget.array[arrayTarget.index], value)) {
-      arrayTarget.array[arrayTarget.index] = value;
+  if (Array.isArray(cursor)) {
+    if (!isArrayIndexSegment(leaf)) {
+      throw new Error(`Invalid array index segment "${leaf}" at ${segments.join(".")}.`);
+    }
+    const arrayIndex = Number.parseInt(leaf, 10);
+    if (!isDeepStrictEqual(cursor[arrayIndex], value)) {
+      cursor[arrayIndex] = value;
       changed = true;
     }
     return changed;
@@ -157,16 +103,46 @@ export function setPathExistingStrict(
   segments: string[],
   value: unknown,
 ): boolean {
-  const cursor = traverseToLeafParent({ root, segments, requireExistingSegment: true });
+  if (segments.length === 0) {
+    throw new Error("Target path is empty.");
+  }
+  let cursor: unknown = root;
+
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    const segment = segments[index] ?? "";
+    if (Array.isArray(cursor)) {
+      if (!isArrayIndexSegment(segment)) {
+        throw new Error(`Invalid array index segment "${segment}" at ${segments.join(".")}.`);
+      }
+      const arrayIndex = Number.parseInt(segment, 10);
+      if (arrayIndex < 0 || arrayIndex >= cursor.length) {
+        throw new Error(
+          `Path segment does not exist at ${segments.slice(0, index + 1).join(".")}.`,
+        );
+      }
+      cursor = cursor[arrayIndex];
+      continue;
+    }
+    if (!isRecord(cursor)) {
+      throw new Error(`Invalid path shape at ${segments.slice(0, index).join(".") || "<root>"}.`);
+    }
+    if (!Object.prototype.hasOwnProperty.call(cursor, segment)) {
+      throw new Error(`Path segment does not exist at ${segments.slice(0, index + 1).join(".")}.`);
+    }
+    cursor = cursor[segment];
+  }
 
   const leaf = segments[segments.length - 1] ?? "";
-  const arrayTarget = parseArrayLeafTarget(cursor, leaf, segments);
-  if (arrayTarget) {
-    if (arrayTarget.index < 0 || arrayTarget.index >= arrayTarget.array.length) {
+  if (Array.isArray(cursor)) {
+    if (!isArrayIndexSegment(leaf)) {
+      throw new Error(`Invalid array index segment "${leaf}" at ${segments.join(".")}.`);
+    }
+    const arrayIndex = Number.parseInt(leaf, 10);
+    if (arrayIndex < 0 || arrayIndex >= cursor.length) {
       throw new Error(`Path segment does not exist at ${segments.join(".")}.`);
     }
-    if (!isDeepStrictEqual(arrayTarget.array[arrayTarget.index], value)) {
-      arrayTarget.array[arrayTarget.index] = value;
+    if (!isDeepStrictEqual(cursor[arrayIndex], value)) {
+      cursor[arrayIndex] = value;
       return true;
     }
     return false;
@@ -185,16 +161,36 @@ export function setPathExistingStrict(
 }
 
 export function deletePathStrict(root: OpenClawConfig, segments: string[]): boolean {
-  const cursor = traverseToLeafParent({ root, segments, requireExistingSegment: false });
+  if (segments.length === 0) {
+    throw new Error("Target path is empty.");
+  }
+  let cursor: unknown = root;
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    const segment = segments[index] ?? "";
+    if (Array.isArray(cursor)) {
+      if (!isArrayIndexSegment(segment)) {
+        throw new Error(`Invalid array index segment "${segment}" at ${segments.join(".")}.`);
+      }
+      cursor = cursor[Number.parseInt(segment, 10)];
+      continue;
+    }
+    if (!isRecord(cursor)) {
+      throw new Error(`Invalid path shape at ${segments.slice(0, index).join(".") || "<root>"}.`);
+    }
+    cursor = cursor[segment];
+  }
 
   const leaf = segments[segments.length - 1] ?? "";
-  const arrayTarget = parseArrayLeafTarget(cursor, leaf, segments);
-  if (arrayTarget) {
-    if (arrayTarget.index < 0 || arrayTarget.index >= arrayTarget.array.length) {
+  if (Array.isArray(cursor)) {
+    if (!isArrayIndexSegment(leaf)) {
+      throw new Error(`Invalid array index segment "${leaf}" at ${segments.join(".")}.`);
+    }
+    const arrayIndex = Number.parseInt(leaf, 10);
+    if (arrayIndex < 0 || arrayIndex >= cursor.length) {
       return false;
     }
     // Arrays are compacted to preserve predictable index semantics.
-    arrayTarget.array.splice(arrayTarget.index, 1);
+    cursor.splice(arrayIndex, 1);
     return true;
   }
   if (!isRecord(cursor)) {

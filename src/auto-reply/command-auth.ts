@@ -3,7 +3,6 @@ import { getChannelDock, listChannelDocks } from "../channels/dock.js";
 import type { ChannelId } from "../channels/plugins/types.js";
 import { normalizeAnyChannelId } from "../channels/registry.js";
 import type { OpenClawConfig } from "../config/config.js";
-import { normalizeStringEntries } from "../shared/string-normalization.js";
 import {
   INTERNAL_MESSAGE_CHANNEL,
   isInternalMessageChannel,
@@ -86,7 +85,7 @@ function formatAllowFromList(params: {
   if (dock?.config?.formatAllowFrom) {
     return dock.config.formatAllowFrom({ cfg, accountId, allowFrom });
   }
-  return normalizeStringEntries(allowFrom);
+  return allowFrom.map((entry) => String(entry).trim()).filter(Boolean);
 }
 
 function normalizeAllowFromEntry(params: {
@@ -351,8 +350,8 @@ export function resolveCommandAuthorization(params: {
     isInternalMessageChannel(ctx.Provider) &&
     Array.isArray(ctx.GatewayClientScopes) &&
     ctx.GatewayClientScopes.includes("operator.admin");
+  const senderIsOwner = senderIsOwnerByIdentity || senderIsOwnerByScope;
   const ownerAllowlistConfigured = ownerAllowAll || explicitOwners.length > 0;
-  const senderIsOwner = senderIsOwnerByIdentity || senderIsOwnerByScope || ownerAllowAll;
   const requireOwner = enforceOwner || ownerAllowlistConfigured;
   const isOwnerForCommands = !requireOwner
     ? true

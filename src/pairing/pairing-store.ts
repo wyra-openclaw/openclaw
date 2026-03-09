@@ -104,14 +104,6 @@ function resolveAllowFromPath(
   );
 }
 
-export function resolveChannelAllowFromPath(
-  channel: PairingChannel,
-  env: NodeJS.ProcessEnv = process.env,
-  accountId?: string,
-): string {
-  return resolveAllowFromPath(channel, env, accountId);
-}
-
 async function readJsonFile<T>(
   filePath: string,
   fallback: T,

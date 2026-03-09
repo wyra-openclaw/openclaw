@@ -6,7 +6,6 @@ import {
   createScopedPairingAccess,
   DEFAULT_GROUP_HISTORY_LIMIT,
   type HistoryEntry,
-  issuePairingChallenge,
   normalizeAgentId,
   recordPendingHistoryEntryIfEnabled,
   resolveOpenProviderRuntimeGroupPolicy,
@@ -1102,29 +1101,29 @@ export async function handleFeishuMessage(params: {
 
     if (isDirect && dmPolicy !== "open" && !dmAllowed) {
       if (dmPolicy === "pairing") {
-        await issuePairingChallenge({
-          channel: "feishu",
-          senderId: ctx.senderOpenId,
-          senderIdLine: `Your Feishu user id: ${ctx.senderOpenId}`,
+        const { code, created } = await pairing.upsertPairingRequest({
+          id: ctx.senderOpenId,
           meta: { name: ctx.senderName },
-          upsertPairingRequest: pairing.upsertPairingRequest,
-          onCreated: () => {
-            log(`feishu[${account.accountId}]: pairing request sender=${ctx.senderOpenId}`);
-          },
-          sendPairingReply: async (text) => {
+        });
+        if (created) {
+          log(`feishu[${account.accountId}]: pairing request sender=${ctx.senderOpenId}`);
+          try {
             await sendMessageFeishu({
               cfg,
               to: `chat:${ctx.chatId}`,
-              text,
+              text: core.channel.pairing.buildPairingReply({
+                channel: "feishu",
+                idLine: `Your Feishu user id: ${ctx.senderOpenId}`,
+                code,
+              }),
               accountId: account.accountId,
             });
-          },
-          onReplyError: (err) => {
+          } catch (err) {
             log(
               `feishu[${account.accountId}]: pairing reply failed for ${ctx.senderOpenId}: ${String(err)}`,
             );
-          },
-        });
+          }
+        }
       } else {
         log(
           `feishu[${account.accountId}]: blocked unauthorized sender ${ctx.senderOpenId} (dmPolicy=${dmPolicy})`,

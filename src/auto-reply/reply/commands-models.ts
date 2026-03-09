@@ -1,11 +1,12 @@
 import { resolveAgentDir, resolveSessionAgentId } from "../../agents/agent-scope.js";
+import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../../agents/defaults.js";
 import { resolveModelAuthLabel } from "../../agents/model-auth-label.js";
 import { loadModelCatalog } from "../../agents/model-catalog.js";
 import {
   buildAllowedModelSet,
   buildModelAliasIndex,
   normalizeProviderId,
-  resolveDefaultModelForAgent,
+  resolveConfiguredModelRef,
   resolveModelRefFromString,
 } from "../../agents/model-selection.js";
 import type { OpenClawConfig } from "../../config/config.js";
@@ -34,13 +35,11 @@ export type ModelsProviderData = {
  * Build provider/model data from config and catalog.
  * Exported for reuse by callback handlers.
  */
-export async function buildModelsProviderData(
-  cfg: OpenClawConfig,
-  agentId?: string,
-): Promise<ModelsProviderData> {
-  const resolvedDefault = resolveDefaultModelForAgent({
+export async function buildModelsProviderData(cfg: OpenClawConfig): Promise<ModelsProviderData> {
+  const resolvedDefault = resolveConfiguredModelRef({
     cfg,
-    agentId,
+    defaultProvider: DEFAULT_PROVIDER,
+    defaultModel: DEFAULT_MODEL,
   });
 
   const catalog = await loadModelCatalog({ config: cfg });
@@ -221,7 +220,6 @@ export async function resolveModelsCommandReply(params: {
   commandBodyNormalized: string;
   surface?: string;
   currentModel?: string;
-  agentId?: string;
   agentDir?: string;
   sessionEntry?: SessionEntry;
 }): Promise<ReplyPayload | null> {
@@ -233,7 +231,7 @@ export async function resolveModelsCommandReply(params: {
   const argText = body.replace(/^\/models\b/i, "").trim();
   const { provider, page, pageSize, all } = parseModelsArgs(argText);
 
-  const { byProvider, providers } = await buildModelsProviderData(params.cfg, params.agentId);
+  const { byProvider, providers } = await buildModelsProviderData(params.cfg);
   const isTelegram = params.surface === "telegram";
 
   // Provider list (no provider specified)
@@ -388,7 +386,6 @@ export const handleModelsCommand: CommandHandler = async (params, allowTextComma
     commandBodyNormalized,
     surface: params.ctx.Surface,
     currentModel: params.model ? `${params.provider}/${params.model}` : undefined,
-    agentId: modelsAgentId,
     agentDir: modelsAgentDir,
     sessionEntry: params.sessionEntry,
   });

@@ -317,11 +317,20 @@ describe("createSynologyChatPlugin", () => {
   });
 
   describe("gateway", () => {
-    async function expectPendingStartAccountPromise(
-      result: Promise<unknown>,
-      abortController: AbortController,
-    ) {
+    it("startAccount returns pending promise for disabled account", async () => {
+      const plugin = createSynologyChatPlugin();
+      const abortController = new AbortController();
+      const ctx = {
+        cfg: {
+          channels: { "synology-chat": { enabled: false } },
+        },
+        accountId: "default",
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+        abortSignal: abortController.signal,
+      };
+      const result = plugin.gateway.startAccount(ctx);
       expect(result).toBeInstanceOf(Promise);
+      // Promise should stay pending (never resolve) to prevent restart loop
       const resolved = await Promise.race([
         result,
         new Promise((r) => setTimeout(() => r("pending"), 50)),
@@ -329,29 +338,29 @@ describe("createSynologyChatPlugin", () => {
       expect(resolved).toBe("pending");
       abortController.abort();
       await result;
-    }
+    });
 
-    async function expectPendingStartAccount(accountConfig: Record<string, unknown>) {
+    it("startAccount returns pending promise for account without token", async () => {
       const plugin = createSynologyChatPlugin();
       const abortController = new AbortController();
       const ctx = {
         cfg: {
-          channels: { "synology-chat": accountConfig },
+          channels: { "synology-chat": { enabled: true } },
         },
         accountId: "default",
         log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
         abortSignal: abortController.signal,
       };
       const result = plugin.gateway.startAccount(ctx);
-      await expectPendingStartAccountPromise(result, abortController);
-    }
-
-    it("startAccount returns pending promise for disabled account", async () => {
-      await expectPendingStartAccount({ enabled: false });
-    });
-
-    it("startAccount returns pending promise for account without token", async () => {
-      await expectPendingStartAccount({ enabled: true });
+      expect(result).toBeInstanceOf(Promise);
+      // Promise should stay pending (never resolve) to prevent restart loop
+      const resolved = await Promise.race([
+        result,
+        new Promise((r) => setTimeout(() => r("pending"), 50)),
+      ]);
+      expect(resolved).toBe("pending");
+      abortController.abort();
+      await result;
     });
 
     it("startAccount refuses allowlist accounts with empty allowedUserIds", async () => {
@@ -378,9 +387,16 @@ describe("createSynologyChatPlugin", () => {
       };
 
       const result = plugin.gateway.startAccount(ctx);
-      await expectPendingStartAccountPromise(result, abortController);
+      expect(result).toBeInstanceOf(Promise);
+      const resolved = await Promise.race([
+        result,
+        new Promise((r) => setTimeout(() => r("pending"), 50)),
+      ]);
+      expect(resolved).toBe("pending");
       expect(ctx.log.warn).toHaveBeenCalledWith(expect.stringContaining("empty allowedUserIds"));
       expect(registerMock).not.toHaveBeenCalled();
+      abortController.abort();
+      await result;
     });
 
     it("deregisters stale route before re-registering same account/path", async () => {

@@ -8,7 +8,6 @@ import { convertMarkdownTables } from "../markdown/tables.js";
 import { markdownToWhatsApp } from "../markdown/whatsapp.js";
 import { normalizePollInput, type PollInput } from "../polls.js";
 import { toWhatsappJid } from "../utils.js";
-import { resolveWhatsAppAccount, resolveWhatsAppMediaMaxBytes } from "./accounts.js";
 import { type ActiveWebSendOptions, requireActiveWebListener } from "./active-listener.js";
 import { loadWebMedia } from "./media.js";
 
@@ -33,10 +32,6 @@ export async function sendMessageWhatsApp(
     options.accountId,
   );
   const cfg = options.cfg ?? loadConfig();
-  const account = resolveWhatsAppAccount({
-    cfg,
-    accountId: resolvedAccountId ?? options.accountId,
-  });
   const tableMode = resolveMarkdownTableMode({
     cfg,
     channel: "whatsapp",
@@ -58,7 +53,6 @@ export async function sendMessageWhatsApp(
     let documentFileName: string | undefined;
     if (options.mediaUrl) {
       const media = await loadWebMedia(options.mediaUrl, {
-        maxBytes: resolveWhatsAppMediaMaxBytes(account),
         localRoots: options.mediaLocalRoots,
       });
       const caption = text || undefined;

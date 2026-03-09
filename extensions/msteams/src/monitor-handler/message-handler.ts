@@ -2,19 +2,15 @@ import {
   DEFAULT_ACCOUNT_ID,
   buildPendingHistoryContextFromMap,
   clearHistoryEntriesIfEnabled,
-  dispatchReplyFromConfigWithSettledDispatcher,
   DEFAULT_GROUP_HISTORY_LIMIT,
   createScopedPairingAccess,
   logInboundDrop,
-  evaluateSenderGroupAccessForPolicy,
-  resolveSenderScopedGroupPolicy,
   recordPendingHistoryEntryIfEnabled,
   resolveControlCommandGate,
   resolveDefaultGroupPolicy,
   isDangerousNameMatchingEnabled,
   readStoreAllowFromForDmPolicy,
   resolveMentionGating,
-  resolveInboundSessionEnvelopeContext,
   formatAllowlistMatchMeta,
   resolveEffectiveAllowFromLists,
   resolveDmGroupAccessWithLists,
@@ -176,10 +172,12 @@ export function createMSTeamsMessageHandler(deps: MSTeamsMessageHandlerDeps) {
       conversationId,
       channelName,
     });
-    const senderGroupPolicy = resolveSenderScopedGroupPolicy({
-      groupPolicy,
-      groupAllowFrom: effectiveGroupAllowFrom,
-    });
+    const senderGroupPolicy =
+      groupPolicy === "disabled"
+        ? "disabled"
+        : effectiveGroupAllowFrom.length > 0
+          ? "allowlist"
+          : "open";
     const access = resolveDmGroupAccessWithLists({
       isGroup: !isDirectMessage,
       dmPolicy,
@@ -230,54 +228,46 @@ export function createMSTeamsMessageHandler(deps: MSTeamsMessageHandlerDeps) {
     }
 
     if (!isDirectMessage && msteamsCfg) {
-      if (channelGate.allowlistConfigured && !channelGate.allowed) {
-        log.debug?.("dropping group message (not in team/channel allowlist)", {
-          conversationId,
-          teamKey: channelGate.teamKey ?? "none",
-          channelKey: channelGate.channelKey ?? "none",
-          channelMatchKey: channelGate.channelMatchKey ?? "none",
-          channelMatchSource: channelGate.channelMatchSource ?? "none",
-        });
-        return;
-      }
-      const senderGroupAccess = evaluateSenderGroupAccessForPolicy({
-        groupPolicy,
-        groupAllowFrom: effectiveGroupAllowFrom,
-        senderId,
-        isSenderAllowed: (_senderId, allowFrom) =>
-          resolveMSTeamsAllowlistMatch({
-            allowFrom,
-            senderId,
-            senderName,
-            allowNameMatching: isDangerousNameMatchingEnabled(msteamsCfg),
-          }).allowed,
-      });
-
-      if (!senderGroupAccess.allowed && senderGroupAccess.reason === "disabled") {
+      if (groupPolicy === "disabled") {
         log.debug?.("dropping group message (groupPolicy: disabled)", {
           conversationId,
         });
         return;
       }
-      if (!senderGroupAccess.allowed && senderGroupAccess.reason === "empty_allowlist") {
-        log.debug?.("dropping group message (groupPolicy: allowlist, no allowlist)", {
-          conversationId,
-        });
-        return;
-      }
-      if (!senderGroupAccess.allowed && senderGroupAccess.reason === "sender_not_allowlisted") {
-        const allowMatch = resolveMSTeamsAllowlistMatch({
-          allowFrom: effectiveGroupAllowFrom,
-          senderId,
-          senderName,
-          allowNameMatching: isDangerousNameMatchingEnabled(msteamsCfg),
-        });
-        log.debug?.("dropping group message (not in groupAllowFrom)", {
-          sender: senderId,
-          label: senderName,
-          allowlistMatch: formatAllowlistMatchMeta(allowMatch),
-        });
-        return;
+
+      if (groupPolicy === "allowlist") {
+        if (channelGate.allowlistConfigured && !channelGate.allowed) {
+          log.debug?.("dropping group message (not in team/channel allowlist)", {
+            conversationId,
+            teamKey: channelGate.teamKey ?? "none",
+            channelKey: channelGate.channelKey ?? "none",
+            channelMatchKey: channelGate.channelMatchKey ?? "none",
+            channelMatchSource: channelGate.channelMatchSource ?? "none",
+          });
+          return;
+        }
+        if (effectiveGroupAllowFrom.length === 0 && !channelGate.allowlistConfigured) {
+          log.debug?.("dropping group message (groupPolicy: allowlist, no allowlist)", {
+            conversationId,
+          });
+          return;
+        }
+        if (effectiveGroupAllowFrom.length > 0 && access.decision !== "allow") {
+          const allowMatch = resolveMSTeamsAllowlistMatch({
+            allowFrom: effectiveGroupAllowFrom,
+            senderId,
+            senderName,
+            allowNameMatching: isDangerousNameMatchingEnabled(msteamsCfg),
+          });
+          if (!allowMatch.allowed) {
+            log.debug?.("dropping group message (not in groupAllowFrom)", {
+              sender: senderId,
+              label: senderName,
+              allowlistMatch: formatAllowlistMatchMeta(allowMatch),
+            });
+            return;
+          }
+        }
       }
     }
 
@@ -461,9 +451,12 @@ export function createMSTeamsMessageHandler(deps: MSTeamsMessageHandlerDeps) {
 
     const mediaPayload = buildMSTeamsMediaPayload(mediaList);
     const envelopeFrom = isDirectMessage ? senderName : conversationType;
-    const { storePath, envelopeOptions, previousTimestamp } = resolveInboundSessionEnvelopeContext({
-      cfg,
+    const storePath = core.channel.session.resolveStorePath(cfg.session?.store, {
       agentId: route.agentId,
+    });
+    const envelopeOptions = core.channel.reply.resolveEnvelopeFormatOptions(cfg);
+    const previousTimestamp = core.channel.session.readSessionUpdatedAt({
+      storePath,
       sessionKey: route.sessionKey,
     });
     const body = core.channel.reply.formatAgentEnvelope({
@@ -566,14 +559,18 @@ export function createMSTeamsMessageHandler(deps: MSTeamsMessageHandlerDeps) {
 
     log.info("dispatching to agent", { sessionKey: route.sessionKey });
     try {
-      const { queuedFinal, counts } = await dispatchReplyFromConfigWithSettledDispatcher({
-        cfg,
-        ctxPayload,
+      const { queuedFinal, counts } = await core.channel.reply.withReplyDispatcher({
         dispatcher,
         onSettled: () => {
           markDispatchIdle();
         },
-        replyOptions,
+        run: () =>
+          core.channel.reply.dispatchReplyFromConfig({
+            ctx: ctxPayload,
+            cfg,
+            dispatcher,
+            replyOptions,
+          }),
       });
 
       log.info("dispatch complete", { queuedFinal, counts });

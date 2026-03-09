@@ -20,7 +20,7 @@ describe("mistralProvider", () => {
     const result = await mistralProvider.transcribeAudio!({
       buffer: Buffer.from("audio-bytes"),
       fileName: "voice.ogg",
-      apiKey: "test-mistral-key", // pragma: allowlist secret
+      apiKey: "test-mistral-key",
       timeoutMs: 5000,
       fetchFn,
     });
@@ -35,7 +35,7 @@ describe("mistralProvider", () => {
     await mistralProvider.transcribeAudio!({
       buffer: Buffer.from("audio"),
       fileName: "note.mp3",
-      apiKey: "key", // pragma: allowlist secret
+      apiKey: "key",
       timeoutMs: 1000,
       baseUrl: "https://custom.mistral.example/v1",
       fetchFn,

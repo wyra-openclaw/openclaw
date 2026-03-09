@@ -50,30 +50,14 @@ export async function setupCommand(
         workspace,
       },
     },
-    gateway: {
-      ...cfg.gateway,
-      mode: cfg.gateway?.mode ?? "local",
-    },
   };
 
-  if (
-    !existingRaw.exists ||
-    defaults.workspace !== workspace ||
-    cfg.gateway?.mode !== next.gateway?.mode
-  ) {
+  if (!existingRaw.exists || defaults.workspace !== workspace) {
     await writeConfigFile(next);
     if (!existingRaw.exists) {
       runtime.log(`Wrote ${formatConfigPath(configPath)}`);
     } else {
-      const updates: string[] = [];
-      if (defaults.workspace !== workspace) {
-        updates.push("set agents.defaults.workspace");
-      }
-      if (cfg.gateway?.mode !== next.gateway?.mode) {
-        updates.push("set gateway.mode");
-      }
-      const suffix = updates.length > 0 ? `(${updates.join(", ")})` : undefined;
-      logConfigUpdated(runtime, { path: configPath, suffix });
+      logConfigUpdated(runtime, { path: configPath, suffix: "(set agents.defaults.workspace)" });
     }
   } else {
     runtime.log(`Config OK: ${formatConfigPath(configPath)}`);

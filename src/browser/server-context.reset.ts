@@ -1,8 +1,6 @@
 import fs from "node:fs";
 import type { ResolvedBrowserProfile } from "./config.js";
-import { BrowserResetUnsupportedError } from "./errors.js";
 import { stopChromeExtensionRelayServer } from "./extension-relay.js";
-import { getBrowserProfileCapabilities } from "./profile-capabilities.js";
 import type { ProfileRuntimeState } from "./server-context.types.js";
 import { movePathToTrash } from "./trash.js";
 
@@ -18,10 +16,10 @@ type ResetOps = {
   resetProfile: () => Promise<{ moved: boolean; from: string; to?: string }>;
 };
 
-async function closePlaywrightBrowserConnectionForProfile(cdpUrl?: string): Promise<void> {
+async function closePlaywrightBrowserConnection(): Promise<void> {
   try {
     const mod = await import("./pw-ai.js");
-    await mod.closePlaywrightBrowserConnection(cdpUrl ? { cdpUrl } : undefined);
+    await mod.closePlaywrightBrowserConnection();
   } catch {
     // ignore
   }
@@ -34,14 +32,13 @@ export function createProfileResetOps({
   isHttpReachable,
   resolveOpenClawUserDataDir,
 }: ResetDeps): ResetOps {
-  const capabilities = getBrowserProfileCapabilities(profile);
   const resetProfile = async () => {
-    if (capabilities.requiresRelay) {
+    if (profile.driver === "extension") {
       await stopChromeExtensionRelayServer({ cdpUrl: profile.cdpUrl }).catch(() => {});
       return { moved: false, from: profile.cdpUrl };
     }
-    if (!capabilities.supportsReset) {
-      throw new BrowserResetUnsupportedError(
+    if (!profile.cdpIsLoopback) {
+      throw new Error(
         `reset-profile is only supported for local profiles (profile "${profile.name}" is remote).`,
       );
     }
@@ -51,14 +48,14 @@ export function createProfileResetOps({
     const httpReachable = await isHttpReachable(300);
     if (httpReachable && !profileState.running) {
       // Port in use but not by us - kill it.
-      await closePlaywrightBrowserConnectionForProfile(profile.cdpUrl);
+      await closePlaywrightBrowserConnection();
     }
 
     if (profileState.running) {
       await stopRunningBrowser();
     }
 
-    await closePlaywrightBrowserConnectionForProfile(profile.cdpUrl);
+    await closePlaywrightBrowserConnection();
 
     if (!fs.existsSync(userDataDir)) {
       return { moved: false, from: userDataDir };

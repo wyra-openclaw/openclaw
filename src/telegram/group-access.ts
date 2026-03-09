@@ -7,7 +7,6 @@ import type {
   TelegramGroupConfig,
   TelegramTopicConfig,
 } from "../config/types.js";
-import { evaluateMatchedGroupAccessForPolicy } from "../plugin-sdk/group-access.js";
 import { isSenderAllowed, type NormalizedAllowFrom } from "./bot-access.js";
 import { firstDefined } from "./bot-access.js";
 
@@ -175,29 +174,31 @@ export const evaluateTelegramGroupPolicyAccess = (params: {
   }
   if (groupPolicy === "allowlist" && params.enforceAllowlistAuthorization) {
     const senderId = params.senderId ?? "";
-    const senderAuthorization = evaluateMatchedGroupAccessForPolicy({
-      groupPolicy,
-      requireMatchInput: params.requireSenderForAllowlistAuthorization,
-      hasMatchInput: Boolean(senderId),
-      allowlistConfigured:
-        chatExplicitlyAllowed ||
-        params.allowEmptyAllowlistEntries ||
-        params.effectiveGroupAllow.hasEntries,
-      allowlistMatched:
-        (chatExplicitlyAllowed && !params.effectiveGroupAllow.hasEntries) ||
-        isSenderAllowed({
-          allow: params.effectiveGroupAllow,
-          senderId,
-          senderUsername: params.senderUsername ?? "",
-        }),
-    });
-    if (!senderAuthorization.allowed && senderAuthorization.reason === "missing_match_input") {
+    if (params.requireSenderForAllowlistAuthorization && !senderId) {
       return { allowed: false, reason: "group-policy-allowlist-no-sender", groupPolicy };
     }
-    if (!senderAuthorization.allowed && senderAuthorization.reason === "empty_allowlist") {
+    // Skip the "empty allowlist" guard when the chat itself is explicitly
+    // listed in the groups config — the group ID acts as the allowlist entry.
+    if (
+      !chatExplicitlyAllowed &&
+      !params.allowEmptyAllowlistEntries &&
+      !params.effectiveGroupAllow.hasEntries
+    ) {
       return { allowed: false, reason: "group-policy-allowlist-empty", groupPolicy };
     }
-    if (!senderAuthorization.allowed && senderAuthorization.reason === "not_allowlisted") {
+    // When the chat is explicitly allowed and there are no sender-level entries,
+    // skip the sender check — the group ID itself is the authorization.
+    if (chatExplicitlyAllowed && !params.effectiveGroupAllow.hasEntries) {
+      return { allowed: true, groupPolicy };
+    }
+    const senderUsername = params.senderUsername ?? "";
+    if (
+      !isSenderAllowed({
+        allow: params.effectiveGroupAllow,
+        senderId,
+        senderUsername,
+      })
+    ) {
       return { allowed: false, reason: "group-policy-allowlist-unauthorized", groupPolicy };
     }
   }

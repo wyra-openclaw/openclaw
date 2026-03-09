@@ -9,7 +9,6 @@
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 import { Type } from "@sinclair/typebox";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { createBaseToolHandlerState } from "./pi-tool-handler-state.test-helpers.js";
 
 const hookMocks = vi.hoisted(() => ({
   runner: {
@@ -76,7 +75,17 @@ function createToolHandlerCtx() {
     hookRunner: hookMocks.runner,
     state: {
       toolMetaById: new Map<string, unknown>(),
-      ...createBaseToolHandlerState(),
+      toolMetas: [] as Array<{ toolName?: string; meta?: string }>,
+      toolSummaryById: new Set<string>(),
+      lastToolError: undefined,
+      pendingMessagingTexts: new Map<string, string>(),
+      pendingMessagingTargets: new Map<string, unknown>(),
+      pendingMessagingMediaUrls: new Map<string, string[]>(),
+      messagingToolSentTexts: [] as string[],
+      messagingToolSentTextsNormalized: [] as string[],
+      messagingToolSentMediaUrls: [] as string[],
+      messagingToolSentTargets: [] as unknown[],
+      blockBuffer: "",
       successfulCronAdds: 0,
     },
     log: { debug: vi.fn(), warn: vi.fn() },
@@ -238,10 +247,7 @@ describe("after_tool_call fires exactly once in embedded runs", () => {
       result: { content: [{ type: "text", text: "ok" }] },
     });
 
-    expect(beforeToolCallMocks.consumeAdjustedParamsForToolCall).toHaveBeenCalledWith(
-      toolCallId,
-      "integration-test",
-    );
+    expect(beforeToolCallMocks.consumeAdjustedParamsForToolCall).toHaveBeenCalledWith(toolCallId);
     const event = (hookMocks.runner.runAfterToolCall as ReturnType<typeof vi.fn>).mock
       .calls[0]?.[0] as { params?: unknown } | undefined;
     expect(event?.params).toEqual(adjusted);

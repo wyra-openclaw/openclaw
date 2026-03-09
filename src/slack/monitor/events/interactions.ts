@@ -37,7 +37,26 @@ type SelectOption = {
   text?: { text?: string };
 };
 
-type InteractionSelectionFields = Partial<ModalInputSummary>;
+type InteractionSelectionFields = {
+  actionType?: string;
+  blockId?: string;
+  inputKind?: "text" | "number" | "email" | "url" | "rich_text";
+  value?: string;
+  selectedValues?: string[];
+  selectedUsers?: string[];
+  selectedChannels?: string[];
+  selectedConversations?: string[];
+  selectedLabels?: string[];
+  selectedDate?: string;
+  selectedTime?: string;
+  selectedDateTime?: number;
+  inputValue?: string;
+  inputNumber?: number;
+  inputEmail?: string;
+  inputUrl?: string;
+  richTextValue?: unknown;
+  richTextPreview?: string;
+};
 
 type InteractionSummary = InteractionSelectionFields & {
   interactionType?: "block_action" | "view_submission" | "view_closed";

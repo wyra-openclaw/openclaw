@@ -5,10 +5,7 @@ import {
   normalizeOptionalAccountId,
 } from "../../routing/session-key.js";
 
-export function createAccountListHelpers(
-  channelKey: string,
-  options?: { normalizeAccountId?: (id: string) => string },
-) {
+export function createAccountListHelpers(channelKey: string) {
   function resolveConfiguredDefaultAccountId(cfg: OpenClawConfig): string | undefined {
     const channel = cfg.channels?.[channelKey] as Record<string, unknown> | undefined;
     const preferred = normalizeOptionalAccountId(
@@ -30,12 +27,7 @@ export function createAccountListHelpers(
     if (!accounts || typeof accounts !== "object") {
       return [];
     }
-    const ids = Object.keys(accounts as Record<string, unknown>).filter(Boolean);
-    const normalizeConfiguredAccountId = options?.normalizeAccountId;
-    if (!normalizeConfiguredAccountId) {
-      return ids;
-    }
-    return [...new Set(ids.map((id) => normalizeConfiguredAccountId(id)).filter(Boolean))];
+    return Object.keys(accounts as Record<string, unknown>).filter(Boolean);
   }
 
   function listAccountIds(cfg: OpenClawConfig): string[] {

@@ -10,28 +10,6 @@ function asMessages(messages: unknown[]): AgentMessage[] {
   return messages as AgentMessage[];
 }
 
-function makeDualToolUseAssistantContent() {
-  return [
-    { type: "toolUse", id: "tool-1", name: "test1", input: {} },
-    { type: "toolUse", id: "tool-2", name: "test2", input: {} },
-    { type: "text", text: "Done" },
-  ];
-}
-
-function makeDualToolAnthropicTurns(nextUserContent: unknown[]) {
-  return asMessages([
-    { role: "user", content: [{ type: "text", text: "Use tools" }] },
-    {
-      role: "assistant",
-      content: makeDualToolUseAssistantContent(),
-    },
-    {
-      role: "user",
-      content: nextUserContent,
-    },
-  ]);
-}
-
 describe("validate turn edge cases", () => {
   it("returns empty array unchanged", () => {
     expect(validateGeminiTurns([])).toEqual([]);
@@ -432,7 +410,18 @@ describe("validateAnthropicTurns strips dangling tool_use blocks", () => {
   });
 
   it("should handle multiple dangling tool_use blocks", () => {
-    const msgs = makeDualToolAnthropicTurns([{ type: "text", text: "OK" }]);
+    const msgs = asMessages([
+      { role: "user", content: [{ type: "text", text: "Use tools" }] },
+      {
+        role: "assistant",
+        content: [
+          { type: "toolUse", id: "tool-1", name: "test1", input: {} },
+          { type: "toolUse", id: "tool-2", name: "test2", input: {} },
+          { type: "text", text: "Done" },
+        ],
+      },
+      { role: "user", content: [{ type: "text", text: "OK" }] },
+    ]);
 
     const result = validateAnthropicTurns(msgs);
 
@@ -443,13 +432,27 @@ describe("validateAnthropicTurns strips dangling tool_use blocks", () => {
   });
 
   it("should handle mixed tool_use with some having matching tool_result", () => {
-    const msgs = makeDualToolAnthropicTurns([
+    const msgs = asMessages([
+      { role: "user", content: [{ type: "text", text: "Use tools" }] },
       {
-        type: "toolResult",
-        toolUseId: "tool-1",
-        content: [{ type: "text", text: "Result 1" }],
+        role: "assistant",
+        content: [
+          { type: "toolUse", id: "tool-1", name: "test1", input: {} },
+          { type: "toolUse", id: "tool-2", name: "test2", input: {} },
+          { type: "text", text: "Done" },
+        ],
       },
-      { type: "text", text: "Thanks" },
+      {
+        role: "user",
+        content: [
+          {
+            type: "toolResult",
+            toolUseId: "tool-1",
+            content: [{ type: "text", text: "Result 1" }],
+          },
+          { type: "text", text: "Thanks" },
+        ],
+      },
     ]);
 
     const result = validateAnthropicTurns(msgs);
@@ -483,11 +486,25 @@ describe("validateAnthropicTurns strips dangling tool_use blocks", () => {
   });
 
   it("is replay-safe across repeated validation passes", () => {
-    const msgs = makeDualToolAnthropicTurns([
+    const msgs = asMessages([
+      { role: "user", content: [{ type: "text", text: "Use tools" }] },
       {
-        type: "toolResult",
-        toolUseId: "tool-1",
-        content: [{ type: "text", text: "Result 1" }],
+        role: "assistant",
+        content: [
+          { type: "toolUse", id: "tool-1", name: "test1", input: {} },
+          { type: "toolUse", id: "tool-2", name: "test2", input: {} },
+          { type: "text", text: "Done" },
+        ],
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "toolResult",
+            toolUseId: "tool-1",
+            content: [{ type: "text", text: "Result 1" }],
+          },
+        ],
       },
     ]);
 

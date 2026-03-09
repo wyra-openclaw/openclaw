@@ -79,9 +79,7 @@ export function analyzeCommandSecretAssignmentsFromSnapshot(params: {
       value: resolved,
     });
 
-    const hasCompetingSiblingRef =
-      target.entry.secretShape === "sibling_ref" && explicitRef && inlineCandidateRef; // pragma: allowlist secret
-    if (hasCompetingSiblingRef) {
+    if (target.entry.secretShape === "sibling_ref" && explicitRef && inlineCandidateRef) {
       diagnostics.push(
         `${target.path}: both inline and sibling ref were present; sibling ref took precedence.`,
       );

@@ -30,7 +30,6 @@ describe("diffs plugin registration", () => {
       registerService() {},
       registerProvider() {},
       registerCommand() {},
-      registerContextEngine() {},
       resolvePath(input: string) {
         return input;
       },
@@ -106,7 +105,6 @@ describe("diffs plugin registration", () => {
       registerService() {},
       registerProvider() {},
       registerCommand() {},
-      registerContextEngine() {},
       resolvePath(input: string) {
         return input;
       },
@@ -140,14 +138,9 @@ describe("diffs plugin registration", () => {
   });
 });
 
-function localReq(input: {
-  method: string;
-  url: string;
-  headers?: IncomingMessage["headers"];
-}): IncomingMessage {
+function localReq(input: { method: string; url: string }): IncomingMessage {
   return {
     ...input,
-    headers: input.headers ?? {},
     socket: { remoteAddress: "127.0.0.1" },
   } as unknown as IncomingMessage;
 }

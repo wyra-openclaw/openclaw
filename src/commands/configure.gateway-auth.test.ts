@@ -21,7 +21,7 @@ describe("buildGatewayAuthConfig", () => {
     const result = buildGatewayAuthConfig({
       existing: {
         mode: "password",
-        password: "secret", // pragma: allowlist secret
+        password: "secret",
         allowTailscale: true,
       },
       mode: "token",
@@ -35,7 +35,7 @@ describe("buildGatewayAuthConfig", () => {
     const result = buildGatewayAuthConfig({
       existing: {
         mode: "password",
-        password: "secret", // pragma: allowlist secret
+        password: "secret",
         allowTailscale: false,
       },
       mode: "token",
@@ -53,19 +53,19 @@ describe("buildGatewayAuthConfig", () => {
     const result = buildGatewayAuthConfig({
       existing: { mode: "token", token: "abc" },
       mode: "password",
-      password: "secret", // pragma: allowlist secret
+      password: "secret",
     });
 
-    expect(result).toEqual({ mode: "password", password: "secret" }); // pragma: allowlist secret
+    expect(result).toEqual({ mode: "password", password: "secret" });
   });
 
   it("does not silently omit password when literal string is provided", () => {
     const result = buildGatewayAuthConfig({
       mode: "password",
-      password: "undefined", // pragma: allowlist secret
+      password: "undefined",
     });
 
-    expect(result).toEqual({ mode: "password", password: "undefined" }); // pragma: allowlist secret
+    expect(result).toEqual({ mode: "password", password: "undefined" });
   });
 
   it("generates random token for missing, empty, and coerced-literal token inputs", () => {
@@ -165,7 +165,7 @@ describe("buildGatewayAuthConfig", () => {
       existing: {
         mode: "token",
         token: "abc",
-        password: "secret", // pragma: allowlist secret
+        password: "secret",
       },
       mode: "trusted-proxy",
       trustedProxy: {

@@ -1,4 +1,3 @@
-import AppKit
 import Observation
 import SwiftUI
 
@@ -98,10 +97,6 @@ struct SettingsRootView: View {
         }
         .onChange(of: self.selectedTab) { _, newValue in
             self.updatePermissionMonitoring(for: newValue)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            guard self.selectedTab == .permissions else { return }
-            Task { await self.refreshPerms() }
         }
         .onDisappear { self.stopPermissionMonitoring() }
         .task {

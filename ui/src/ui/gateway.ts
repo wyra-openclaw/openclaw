@@ -9,10 +9,6 @@ import {
   ConnectErrorDetailCodes,
   readConnectErrorDetailCode,
 } from "../../../src/gateway/protocol/connect-error-details.js";
-import {
-  ConnectErrorDetailCodes,
-  readConnectErrorDetailCode,
-} from "../../../src/gateway/protocol/connect-error-details.js";
 import { clearDeviceAuthToken, loadDeviceAuthToken, storeDeviceAuthToken } from "./device-auth.ts";
 import { loadOrCreateDeviceIdentity, signDevicePayload } from "./device-identity.ts";
 import { generateUUID } from "./uuid.ts";
@@ -55,29 +51,6 @@ export function resolveGatewayErrorDetailCode(
   error: { details?: unknown } | null | undefined,
 ): string | null {
   return readConnectErrorDetailCode(error?.details);
-}
-
-/**
- * Auth errors that won't resolve without user action — don't auto-reconnect.
- *
- * NOTE: AUTH_TOKEN_MISMATCH is intentionally NOT included here because the
- * browser client has a device-token fallback flow: a stale cached device token
- * triggers a mismatch, sendConnect() clears it, and the next reconnect retries
- * with opts.token (the shared gateway token). Blocking reconnect on mismatch
- * would break that fallback. The rate limiter still catches persistent wrong
- * tokens after N failures → AUTH_RATE_LIMITED stops the loop.
- */
-export function isNonRecoverableAuthError(error: GatewayErrorInfo | undefined): boolean {
-  if (!error) {
-    return false;
-  }
-  const code = resolveGatewayErrorDetailCode(error);
-  return (
-    code === ConnectErrorDetailCodes.AUTH_TOKEN_MISSING ||
-    code === ConnectErrorDetailCodes.AUTH_PASSWORD_MISSING ||
-    code === ConnectErrorDetailCodes.AUTH_PASSWORD_MISMATCH ||
-    code === ConnectErrorDetailCodes.AUTH_RATE_LIMITED
-  );
 }
 
 export type GatewayHelloOk = {
@@ -219,9 +192,7 @@ export class GatewayBrowserClient {
     const role = "operator";
     let deviceIdentity: Awaited<ReturnType<typeof loadOrCreateDeviceIdentity>> | null = null;
     let canFallbackToShared = false;
-    const explicitGatewayToken = this.opts.token?.trim() || undefined;
-    let authToken = explicitGatewayToken;
-    let deviceToken: string | undefined;
+    let authToken = this.opts.token;
 
     if (isSecureContext) {
       deviceIdentity = await loadOrCreateDeviceIdentity();
@@ -233,7 +204,6 @@ export class GatewayBrowserClient {
       authToken = this.opts.token ?? storedToken;
       canFallbackToShared = Boolean(storedToken && this.opts.token);
     }
-    authToken = explicitGatewayToken ?? deviceToken;
     const auth =
       authToken || this.opts.password
         ? {
@@ -287,7 +257,7 @@ export class GatewayBrowserClient {
       role,
       scopes,
       device,
-      caps: ["tool-events"],
+      caps: [],
       auth,
       userAgent: navigator.userAgent,
       locale: navigator.language,

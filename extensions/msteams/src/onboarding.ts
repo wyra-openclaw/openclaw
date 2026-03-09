@@ -7,14 +7,11 @@ import type {
   MSTeamsTeamConfig,
 } from "openclaw/plugin-sdk/msteams";
 import {
+  addWildcardAllowFrom,
   DEFAULT_ACCOUNT_ID,
   formatDocsLink,
   mergeAllowFromEntries,
   promptChannelAccessConfig,
-  setTopLevelChannelAllowFrom,
-  setTopLevelChannelDmPolicyWithAllowFrom,
-  setTopLevelChannelGroupPolicy,
-  splitOnboardingEntries,
 } from "openclaw/plugin-sdk/msteams";
 import {
   parseMSTeamsTeamEntry,
@@ -27,19 +24,41 @@ import { hasConfiguredMSTeamsCredentials, resolveMSTeamsCredentials } from "./to
 const channel = "msteams" as const;
 
 function setMSTeamsDmPolicy(cfg: OpenClawConfig, dmPolicy: DmPolicy) {
-  return setTopLevelChannelDmPolicyWithAllowFrom({
-    cfg,
-    channel: "msteams",
-    dmPolicy,
-  });
+  const allowFrom =
+    dmPolicy === "open"
+      ? addWildcardAllowFrom(cfg.channels?.msteams?.allowFrom)?.map((entry) => String(entry))
+      : undefined;
+  return {
+    ...cfg,
+    channels: {
+      ...cfg.channels,
+      msteams: {
+        ...cfg.channels?.msteams,
+        dmPolicy,
+        ...(allowFrom ? { allowFrom } : {}),
+      },
+    },
+  };
 }
 
 function setMSTeamsAllowFrom(cfg: OpenClawConfig, allowFrom: string[]): OpenClawConfig {
-  return setTopLevelChannelAllowFrom({
-    cfg,
-    channel: "msteams",
-    allowFrom,
-  });
+  return {
+    ...cfg,
+    channels: {
+      ...cfg.channels,
+      msteams: {
+        ...cfg.channels?.msteams,
+        allowFrom,
+      },
+    },
+  };
+}
+
+function parseAllowFromInput(raw: string): string[] {
+  return raw
+    .split(/[\n,;]+/g)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
 function looksLikeGuid(value: string): boolean {
@@ -96,7 +115,7 @@ async function promptMSTeamsAllowFrom(params: {
       initialValue: existing[0] ? String(existing[0]) : undefined,
       validate: (value) => (String(value ?? "").trim() ? undefined : "Required"),
     });
-    const parts = splitOnboardingEntries(String(entry));
+    const parts = parseAllowFromInput(String(entry));
     if (parts.length === 0) {
       await params.prompter.note("Enter at least one user.", "MS Teams allowlist");
       continue;
@@ -152,12 +171,17 @@ function setMSTeamsGroupPolicy(
   cfg: OpenClawConfig,
   groupPolicy: "open" | "allowlist" | "disabled",
 ): OpenClawConfig {
-  return setTopLevelChannelGroupPolicy({
-    cfg,
-    channel: "msteams",
-    groupPolicy,
-    enabled: true,
-  });
+  return {
+    ...cfg,
+    channels: {
+      ...cfg.channels,
+      msteams: {
+        ...cfg.channels?.msteams,
+        enabled: true,
+        groupPolicy,
+      },
+    },
+  };
 }
 
 function setMSTeamsTeamsAllowlist(

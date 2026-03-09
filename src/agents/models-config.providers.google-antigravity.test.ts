@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   normalizeAntigravityModelId,
-  normalizeGoogleModelId,
   normalizeProviders,
   type ProviderConfig,
 } from "./models-config.providers.js";
@@ -25,7 +24,7 @@ function buildProvider(modelIds: string[]): ProviderConfig {
   return {
     baseUrl: "https://example.invalid/v1",
     api: "openai-completions",
-    apiKey: "EXAMPLE_KEY", // pragma: allowlist secret
+    apiKey: "EXAMPLE_KEY",
     models: modelIds.map((id) => buildModel(id)),
   };
 }
@@ -45,17 +44,6 @@ describe("normalizeAntigravityModelId", () => {
     "claude-opus-4-6-thinking",
   ])("keeps already-tiered and non-pro ids unchanged: %s", (id) => {
     expect(normalizeAntigravityModelId(id)).toBe(id);
-  });
-});
-
-describe("normalizeGoogleModelId", () => {
-  it("maps the deprecated 3.1 flash alias to the real preview model", () => {
-    expect(normalizeGoogleModelId("gemini-3.1-flash")).toBe("gemini-3-flash-preview");
-    expect(normalizeGoogleModelId("gemini-3.1-flash-preview")).toBe("gemini-3-flash-preview");
-  });
-
-  it("adds the preview suffix for gemini 3.1 flash-lite", () => {
-    expect(normalizeGoogleModelId("gemini-3.1-flash-lite")).toBe("gemini-3.1-flash-lite-preview");
   });
 });
 

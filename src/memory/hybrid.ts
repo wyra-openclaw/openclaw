@@ -44,14 +44,8 @@ export function buildFtsQuery(raw: string): string | null {
 }
 
 export function bm25RankToScore(rank: number): number {
-  if (!Number.isFinite(rank)) {
-    return 1 / (1 + 999);
-  }
-  if (rank < 0) {
-    const relevance = -rank;
-    return relevance / (1 + relevance);
-  }
-  return 1 / (1 + rank);
+  const normalized = Number.isFinite(rank) ? Math.max(0, rank) : 999;
+  return 1 / (1 + normalized);
 }
 
 export async function mergeHybridResults(params: {

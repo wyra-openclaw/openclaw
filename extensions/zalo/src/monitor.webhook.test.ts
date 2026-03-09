@@ -94,33 +94,6 @@ function createPairingAuthCore(params?: { storeAllowFrom?: string[]; pairingCrea
   return { core, readAllowFromStore, upsertPairingRequest };
 }
 
-async function postUntilRateLimited(params: {
-  baseUrl: string;
-  path: string;
-  secret: string;
-  withNonceQuery?: boolean;
-  attempts?: number;
-}): Promise<boolean> {
-  const attempts = params.attempts ?? 130;
-  for (let i = 0; i < attempts; i += 1) {
-    const url = params.withNonceQuery
-      ? `${params.baseUrl}${params.path}?nonce=${i}`
-      : `${params.baseUrl}${params.path}`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "x-bot-api-secret-token": params.secret,
-        "content-type": "application/json",
-      },
-      body: "{}",
-    });
-    if (response.status === 429) {
-      return true;
-    }
-  }
-  return false;
-}
-
 describe("handleZaloWebhookRequest", () => {
   afterEach(() => {
     clearZaloWebhookSecurityStateForTest();
@@ -266,11 +239,21 @@ describe("handleZaloWebhookRequest", () => {
 
     try {
       await withServer(webhookRequestHandler, async (baseUrl) => {
-        const saw429 = await postUntilRateLimited({
-          baseUrl,
-          path: "/hook-rate",
-          secret: "secret", // pragma: allowlist secret
-        });
+        let saw429 = false;
+        for (let i = 0; i < 130; i += 1) {
+          const response = await fetch(`${baseUrl}/hook-rate`, {
+            method: "POST",
+            headers: {
+              "x-bot-api-secret-token": "secret",
+              "content-type": "application/json",
+            },
+            body: "{}",
+          });
+          if (response.status === 429) {
+            saw429 = true;
+            break;
+          }
+        }
 
         expect(saw429).toBe(true);
       });
@@ -287,7 +270,7 @@ describe("handleZaloWebhookRequest", () => {
           const response = await fetch(`${baseUrl}/hook-query-status?nonce=${i}`, {
             method: "POST",
             headers: {
-              "x-bot-api-secret-token": "invalid-token", // pragma: allowlist secret
+              "x-bot-api-secret-token": "invalid-token",
               "content-type": "application/json",
             },
             body: "{}",
@@ -307,12 +290,21 @@ describe("handleZaloWebhookRequest", () => {
 
     try {
       await withServer(webhookRequestHandler, async (baseUrl) => {
-        const saw429 = await postUntilRateLimited({
-          baseUrl,
-          path: "/hook-query-rate",
-          secret: "secret", // pragma: allowlist secret
-          withNonceQuery: true,
-        });
+        let saw429 = false;
+        for (let i = 0; i < 130; i += 1) {
+          const response = await fetch(`${baseUrl}/hook-query-rate?nonce=${i}`, {
+            method: "POST",
+            headers: {
+              "x-bot-api-secret-token": "secret",
+              "content-type": "application/json",
+            },
+            body: "{}",
+          });
+          if (response.status === 429) {
+            saw429 = true;
+            break;
+          }
+        }
 
         expect(saw429).toBe(true);
         expect(getZaloWebhookRateLimitStateSizeForTest()).toBe(1);

@@ -7,23 +7,6 @@ import {
   resolveDiffsPluginSecurity,
 } from "./config.js";
 
-const FULL_DEFAULTS = {
-  fontFamily: "JetBrains Mono",
-  fontSize: 17,
-  lineSpacing: 1.8,
-  layout: "split",
-  showLineNumbers: false,
-  diffIndicators: "classic",
-  wordWrap: false,
-  background: false,
-  theme: "light",
-  fileFormat: "pdf",
-  fileQuality: "hq",
-  fileScale: 2.6,
-  fileMaxWidth: 1280,
-  mode: "file",
-} as const;
-
 describe("resolveDiffsPluginDefaults", () => {
   it("returns built-in defaults when config is missing", () => {
     expect(resolveDiffsPluginDefaults(undefined)).toEqual(DEFAULT_DIFFS_TOOL_DEFAULTS);
@@ -32,9 +15,39 @@ describe("resolveDiffsPluginDefaults", () => {
   it("applies configured defaults from plugin config", () => {
     expect(
       resolveDiffsPluginDefaults({
-        defaults: FULL_DEFAULTS,
+        defaults: {
+          fontFamily: "JetBrains Mono",
+          fontSize: 17,
+          lineSpacing: 1.8,
+          layout: "split",
+          showLineNumbers: false,
+          diffIndicators: "classic",
+          wordWrap: false,
+          background: false,
+          theme: "light",
+          fileFormat: "pdf",
+          fileQuality: "hq",
+          fileScale: 2.6,
+          fileMaxWidth: 1280,
+          mode: "file",
+        },
       }),
-    ).toEqual(FULL_DEFAULTS);
+    ).toEqual({
+      fontFamily: "JetBrains Mono",
+      fontSize: 17,
+      lineSpacing: 1.8,
+      layout: "split",
+      showLineNumbers: false,
+      diffIndicators: "classic",
+      wordWrap: false,
+      background: false,
+      theme: "light",
+      fileFormat: "pdf",
+      fileQuality: "hq",
+      fileScale: 2.6,
+      fileMaxWidth: 1280,
+      mode: "file",
+    });
   });
 
   it("clamps and falls back for invalid line spacing and indicators", () => {

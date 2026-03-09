@@ -3,7 +3,7 @@ import OpenClawKit
 import Testing
 @testable import OpenClaw
 
-struct GatewayChannelConnectTests {
+@Suite struct GatewayChannelConnectTests {
     private enum FakeResponse {
         case helloOk(delayMs: Int)
         case invalid(delayMs: Int)
@@ -34,7 +34,7 @@ struct GatewayChannelConnectTests {
             })
     }
 
-    @Test func `concurrent connect is single flight on success`() async throws {
+    @Test func concurrentConnectIsSingleFlightOnSuccess() async throws {
         let session = self.makeSession(response: .helloOk(delayMs: 200))
         let channel = try GatewayChannelActor(
             url: #require(URL(string: "ws://example.invalid")),
@@ -50,7 +50,7 @@ struct GatewayChannelConnectTests {
         #expect(session.snapshotMakeCount() == 1)
     }
 
-    @Test func `concurrent connect shares failure`() async throws {
+    @Test func concurrentConnectSharesFailure() async throws {
         let session = self.makeSession(response: .invalid(delayMs: 200))
         let channel = try GatewayChannelActor(
             url: #require(URL(string: "ws://example.invalid")),

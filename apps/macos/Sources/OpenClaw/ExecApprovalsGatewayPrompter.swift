@@ -11,7 +11,7 @@ final class ExecApprovalsGatewayPrompter {
     private let logger = Logger(subsystem: "ai.openclaw", category: "exec-approvals.gateway")
     private var task: Task<Void, Never>?
 
-    struct GatewayApprovalRequest: Codable {
+    struct GatewayApprovalRequest: Codable, Sendable {
         var id: String
         var request: ExecApprovalPromptRequest
         var createdAtMs: Int

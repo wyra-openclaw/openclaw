@@ -71,15 +71,7 @@ const DEFAULT_CLAUDE_BACKEND: CliBackendConfig = {
 
 const DEFAULT_CODEX_BACKEND: CliBackendConfig = {
   command: "codex",
-  args: [
-    "exec",
-    "--json",
-    "--color",
-    "never",
-    "--sandbox",
-    "workspace-write",
-    "--skip-git-repo-check",
-  ],
+  args: ["exec", "--json", "--color", "never", "--sandbox", "read-only", "--skip-git-repo-check"],
   resumeArgs: [
     "exec",
     "resume",
@@ -87,7 +79,7 @@ const DEFAULT_CODEX_BACKEND: CliBackendConfig = {
     "--color",
     "never",
     "--sandbox",
-    "workspace-write",
+    "read-only",
     "--skip-git-repo-check",
   ],
   output: "jsonl",

@@ -20,7 +20,7 @@ import Testing
         }
     }
 
-    @Test func `begin end fires once per hold`() async {
+    @Test func beginEndFiresOncePerHold() async {
         let counter = Counter()
         let hotkey = VoicePushToTalkHotkey(
             beginAction: { await counter.incBegin() },

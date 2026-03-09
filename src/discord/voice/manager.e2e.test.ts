@@ -199,30 +199,6 @@ describe("DiscordVoiceManager", () => {
     );
   };
 
-  type ProcessSegmentInvoker = {
-    processSegment: (params: {
-      entry: unknown;
-      wavPath: string;
-      userId: string;
-      durationSeconds: number;
-    }) => Promise<void>;
-  };
-
-  const processVoiceSegment = async (
-    manager: InstanceType<typeof managerModule.DiscordVoiceManager>,
-    userId: string,
-  ) =>
-    await (manager as unknown as ProcessSegmentInvoker).processSegment({
-      entry: {
-        guildId: "g1",
-        channelId: "c1",
-        route: { sessionKey: "discord:g1:c1", agentId: "agent-1" },
-      },
-      wavPath: "/tmp/test.wav",
-      userId,
-      durationSeconds: 1.2,
-    });
-
   it("keeps the new session when an old disconnected handler fires", async () => {
     const oldConnection = createConnectionMock();
     const newConnection = createConnectionMock();
@@ -322,7 +298,25 @@ describe("DiscordVoiceManager", () => {
       },
     });
     const manager = createManager({ allowFrom: ["discord:u-owner"] }, client);
-    await processVoiceSegment(manager, "u-owner");
+    await (
+      manager as unknown as {
+        processSegment: (params: {
+          entry: unknown;
+          wavPath: string;
+          userId: string;
+          durationSeconds: number;
+        }) => Promise<void>;
+      }
+    ).processSegment({
+      entry: {
+        guildId: "g1",
+        channelId: "c1",
+        route: { sessionKey: "discord:g1:c1", agentId: "agent-1" },
+      },
+      wavPath: "/tmp/test.wav",
+      userId: "u-owner",
+      durationSeconds: 1.2,
+    });
 
     const commandArgs = agentCommandMock.mock.calls.at(-1)?.[0] as
       | { senderIsOwner?: boolean }
@@ -342,7 +336,25 @@ describe("DiscordVoiceManager", () => {
       },
     });
     const manager = createManager({ allowFrom: ["discord:u-owner"] }, client);
-    await processVoiceSegment(manager, "u-guest");
+    await (
+      manager as unknown as {
+        processSegment: (params: {
+          entry: unknown;
+          wavPath: string;
+          userId: string;
+          durationSeconds: number;
+        }) => Promise<void>;
+      }
+    ).processSegment({
+      entry: {
+        guildId: "g1",
+        channelId: "c1",
+        route: { sessionKey: "discord:g1:c1", agentId: "agent-1" },
+      },
+      wavPath: "/tmp/test.wav",
+      userId: "u-guest",
+      durationSeconds: 1.2,
+    });
 
     const commandArgs = agentCommandMock.mock.calls.at(-1)?.[0] as
       | { senderIsOwner?: boolean }
@@ -362,7 +374,26 @@ describe("DiscordVoiceManager", () => {
       },
     });
     const manager = createManager({ allowFrom: ["discord:u-cache"] }, client);
-    const runSegment = async () => await processVoiceSegment(manager, "u-cache");
+    const runSegment = async () =>
+      await (
+        manager as unknown as {
+          processSegment: (params: {
+            entry: unknown;
+            wavPath: string;
+            userId: string;
+            durationSeconds: number;
+          }) => Promise<void>;
+        }
+      ).processSegment({
+        entry: {
+          guildId: "g1",
+          channelId: "c1",
+          route: { sessionKey: "discord:g1:c1", agentId: "agent-1" },
+        },
+        wavPath: "/tmp/test.wav",
+        userId: "u-cache",
+        durationSeconds: 1.2,
+      });
 
     await runSegment();
     await runSegment();

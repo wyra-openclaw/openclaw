@@ -338,12 +338,13 @@ public final class GatewayDiscoveryModel {
             var attempt = 0
             let startedAt = Date()
             while !Task.isCancelled, Date().timeIntervalSince(startedAt) < 35.0 {
-                let shouldContinue = await MainActor.run {
-                    Self.shouldContinueTailscaleServeDiscovery(
-                        currentGateways: self.gateways,
-                        tailscaleServeGateways: self.tailscaleServeFallbackGateways)
+                let hasResults = await MainActor.run {
+                    if self.filterLocalGateways {
+                        return !self.gateways.isEmpty
+                    }
+                    return self.gateways.contains(where: { !$0.isLocal })
                 }
-                if !shouldContinue { return }
+                if hasResults { return }
 
                 let beacons = await TailscaleServeGatewayDiscovery.discover(timeoutSeconds: 2.4)
                 if !beacons.isEmpty {
@@ -362,15 +363,6 @@ public final class GatewayDiscoveryModel {
         }
     }
 
-    static func shouldContinueTailscaleServeDiscovery(
-        currentGateways _: [DiscoveredGateway],
-        tailscaleServeGateways: [DiscoveredGateway]) -> Bool
-    {
-        // Tailscale Serve is a parallel discovery source. DNS-SD results should not suppress the
-        // probe, otherwise Serve-only gateways disappear as soon as any other remote gateway is found.
-        tailscaleServeGateways.isEmpty
-    }
-
     private var hasUsableWideAreaResults: Bool {
         guard let domain = OpenClawBonjour.wideAreaGatewayServiceDomain else { return false }
         guard let gateways = self.gatewaysByDomain[domain], !gateways.isEmpty else { return false }
@@ -382,9 +374,9 @@ public final class GatewayDiscoveryModel {
         if let host = gateway.serviceHost?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased(),
-            !host.isEmpty,
-            let port = gateway.servicePort,
-            port > 0
+           !host.isEmpty,
+           let port = gateway.servicePort,
+           port > 0
         {
             return "endpoint|\(host):\(port)"
         }
@@ -682,7 +674,7 @@ public final class GatewayDiscoveryModel {
     }
 }
 
-struct ResolvedGatewayService: Equatable {
+struct ResolvedGatewayService: Equatable, Sendable {
     var txt: [String: String]
     var host: String?
     var port: Int?

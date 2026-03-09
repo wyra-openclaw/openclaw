@@ -1,3 +1,5 @@
+import fsp from "node:fs/promises";
+import path from "node:path";
 import type {
   ChannelOnboardingAdapter,
   ChannelOnboardingDmPolicy,
@@ -5,13 +7,14 @@ import type {
   WizardPrompter,
 } from "openclaw/plugin-sdk/zalouser";
 import {
+  addWildcardAllowFrom,
   DEFAULT_ACCOUNT_ID,
   formatResolvedUnresolvedNote,
   mergeAllowFromEntries,
   normalizeAccountId,
+  promptAccountId,
   promptChannelAccessConfig,
-  resolveAccountIdForConfigure,
-  setTopLevelChannelDmPolicyWithAllowFrom,
+  resolvePreferredOpenClawTmpDir,
 } from "openclaw/plugin-sdk/zalouser";
 import {
   listZalouserAccountIds,
@@ -19,7 +22,6 @@ import {
   resolveZalouserAccountSync,
   checkZcaAuthenticated,
 } from "./accounts.js";
-import { writeQrDataUrlToTempFile } from "./qr-temp-file.js";
 import {
   logoutZaloProfile,
   resolveZaloAllowFromEntries,
@@ -73,11 +75,19 @@ function setZalouserDmPolicy(
   cfg: OpenClawConfig,
   dmPolicy: "pairing" | "allowlist" | "open" | "disabled",
 ): OpenClawConfig {
-  return setTopLevelChannelDmPolicyWithAllowFrom({
-    cfg,
-    channel: "zalouser",
-    dmPolicy,
-  }) as OpenClawConfig;
+  const allowFrom =
+    dmPolicy === "open" ? addWildcardAllowFrom(cfg.channels?.zalouser?.allowFrom) : undefined;
+  return {
+    ...cfg,
+    channels: {
+      ...cfg.channels,
+      zalouser: {
+        ...cfg.channels?.zalouser,
+        dmPolicy,
+        ...(allowFrom ? { allowFrom } : {}),
+      },
+    },
+  } as OpenClawConfig;
 }
 
 async function noteZalouserHelp(prompter: WizardPrompter): Promise<void> {
@@ -91,6 +101,25 @@ async function noteZalouserHelp(prompter: WizardPrompter): Promise<void> {
     ].join("\n"),
     "Zalo Personal Setup",
   );
+}
+
+async function writeQrDataUrlToTempFile(
+  qrDataUrl: string,
+  profile: string,
+): Promise<string | null> {
+  const trimmed = qrDataUrl.trim();
+  const match = trimmed.match(/^data:image\/png;base64,(.+)$/i);
+  const base64 = (match?.[1] ?? "").trim();
+  if (!base64) {
+    return null;
+  }
+  const safeProfile = profile.replace(/[^a-zA-Z0-9_-]+/g, "-") || "default";
+  const filePath = path.join(
+    resolvePreferredOpenClawTmpDir(),
+    `openclaw-zalouser-qr-${safeProfile}.png`,
+  );
+  await fsp.writeFile(filePath, Buffer.from(base64, "base64"));
+  return filePath;
 }
 
 async function promptZalouserAllowFrom(params: {
@@ -218,16 +247,20 @@ export const zalouserOnboardingAdapter: ChannelOnboardingAdapter = {
     shouldPromptAccountIds,
     forceAllowFrom,
   }) => {
+    const zalouserOverride = accountOverrides.zalouser?.trim();
     const defaultAccountId = resolveDefaultZalouserAccountId(cfg);
-    const accountId = await resolveAccountIdForConfigure({
-      cfg,
-      prompter,
-      label: "Zalo Personal",
-      accountOverride: accountOverrides.zalouser,
-      shouldPromptAccountIds,
-      listAccountIds: listZalouserAccountIds,
-      defaultAccountId,
-    });
+    let accountId = zalouserOverride ? normalizeAccountId(zalouserOverride) : defaultAccountId;
+
+    if (shouldPromptAccountIds && !zalouserOverride) {
+      accountId = await promptAccountId({
+        cfg,
+        prompter,
+        label: "Zalo Personal",
+        currentId: accountId,
+        listAccountIds: listZalouserAccountIds,
+        defaultAccountId,
+      });
+    }
 
     let next = cfg;
     const account = resolveZalouserAccountSync({ cfg: next, accountId });

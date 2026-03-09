@@ -541,11 +541,8 @@ function buildModelRows(params: {
  * Source-of-truth data for Discord picker views. This intentionally reuses the
  * same provider/model resolver used by text and Telegram model commands.
  */
-export async function loadDiscordModelPickerData(
-  cfg: OpenClawConfig,
-  agentId?: string,
-): Promise<ModelsProviderData> {
-  return buildModelsProviderData(cfg, agentId);
+export async function loadDiscordModelPickerData(cfg: OpenClawConfig): Promise<ModelsProviderData> {
+  return buildModelsProviderData(cfg);
 }
 
 export function buildDiscordModelPickerCustomId(params: {

@@ -1,7 +1,6 @@
 import { resolveGatewayPort } from "../../config/config.js";
 import type { OpenClawConfig, ConfigFileSnapshot } from "../../config/types.js";
 import { hasConfiguredSecretInput } from "../../config/types.secrets.js";
-import { readGatewayPasswordEnv, readGatewayTokenEnv } from "../../gateway/credentials.js";
 import type { GatewayProbeResult } from "../../gateway/probe.js";
 import { resolveConfiguredSecretInputString } from "../../gateway/resolve-configured-secret-input-string.js";
 import { pickPrimaryTailnetIPv4 } from "../../infra/tailnet.js";
@@ -147,6 +146,16 @@ export function sanitizeSshTarget(value: unknown): string | null {
   return trimmed.replace(/^ssh\\s+/, "");
 }
 
+function readGatewayTokenEnv(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const token = env.OPENCLAW_GATEWAY_TOKEN?.trim() || env.CLAWDBOT_GATEWAY_TOKEN?.trim();
+  return token || undefined;
+}
+
+function readGatewayPasswordEnv(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const password = env.OPENCLAW_GATEWAY_PASSWORD?.trim() || env.CLAWDBOT_GATEWAY_PASSWORD?.trim();
+  return password || undefined;
+}
+
 export async function resolveAuthForTarget(
   cfg: OpenClawConfig,
   target: GatewayStatusTarget,
@@ -189,8 +198,6 @@ export async function resolveAuthForTarget(
     }
     return passwordResolution.value;
   };
-  const withDiagnostics = <T extends { token?: string; password?: string }>(result: T) =>
-    diagnostics.length > 0 ? { ...result, diagnostics } : result;
 
   if (target.kind === "configRemote" || target.kind === "sshTunnel") {
     const remoteTokenValue = cfg.gateway?.remote?.token;
@@ -200,7 +207,11 @@ export async function resolveAuthForTarget(
     const password = token
       ? undefined
       : await resolvePassword(remotePasswordValue, "gateway.remote.password");
-    return withDiagnostics({ token, password });
+    return {
+      token,
+      password,
+      ...(diagnostics.length > 0 ? { diagnostics } : {}),
+    };
   }
 
   const authDisabled = authMode === "none" || authMode === "trusted-proxy";
@@ -211,39 +222,49 @@ export async function resolveAuthForTarget(
   const envToken = readGatewayTokenEnv();
   const envPassword = readGatewayPasswordEnv();
   if (tokenOnly) {
-    const token = await resolveToken(cfg.gateway?.auth?.token, "gateway.auth.token");
-    if (token) {
-      return withDiagnostics({ token });
-    }
     if (envToken) {
       return { token: envToken };
     }
-    return withDiagnostics({});
+    const token = await resolveToken(cfg.gateway?.auth?.token, "gateway.auth.token");
+    return {
+      token,
+      ...(diagnostics.length > 0 ? { diagnostics } : {}),
+    };
   }
   if (passwordOnly) {
-    const password = await resolvePassword(cfg.gateway?.auth?.password, "gateway.auth.password");
-    if (password) {
-      return withDiagnostics({ password });
-    }
     if (envPassword) {
       return { password: envPassword };
     }
-    return withDiagnostics({});
+    const password = await resolvePassword(cfg.gateway?.auth?.password, "gateway.auth.password");
+    return {
+      password,
+      ...(diagnostics.length > 0 ? { diagnostics } : {}),
+    };
   }
 
-  const token = await resolveToken(cfg.gateway?.auth?.token, "gateway.auth.token");
-  if (token) {
-    return withDiagnostics({ token });
-  }
   if (envToken) {
     return { token: envToken };
   }
+  const token = await resolveToken(cfg.gateway?.auth?.token, "gateway.auth.token");
+  if (token) {
+    return {
+      token,
+      ...(diagnostics.length > 0 ? { diagnostics } : {}),
+    };
+  }
   if (envPassword) {
-    return withDiagnostics({ password: envPassword });
+    return {
+      password: envPassword,
+      ...(diagnostics.length > 0 ? { diagnostics } : {}),
+    };
   }
   const password = await resolvePassword(cfg.gateway?.auth?.password, "gateway.auth.password");
 
-  return withDiagnostics({ token, password });
+  return {
+    token,
+    password,
+    ...(diagnostics.length > 0 ? { diagnostics } : {}),
+  };
 }
 
 export { pickGatewaySelfPresence };

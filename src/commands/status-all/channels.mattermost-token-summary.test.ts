@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { listChannelPlugins } from "../../channels/plugins/index.js";
 import type { ChannelPlugin } from "../../channels/plugins/types.js";
-import { makeDirectPlugin } from "../../test-utils/channel-plugin-test-fixtures.js";
 import { buildChannelsTable } from "./channels.js";
 
 vi.mock("../../channels/plugins/index.js", () => ({
@@ -118,10 +117,16 @@ function makeUnavailableSlackPlugin(): ChannelPlugin {
 }
 
 function makeSourceAwareUnavailablePlugin(): ChannelPlugin {
-  return makeDirectPlugin({
+  return {
     id: "slack",
-    label: "Slack",
-    docsPath: "/channels/slack",
+    meta: {
+      id: "slack",
+      label: "Slack",
+      selectionLabel: "Slack",
+      docsPath: "/channels/slack",
+      blurb: "test",
+    },
+    capabilities: { chatTypes: ["direct"] },
     config: {
       listAccountIds: () => ["primary"],
       defaultAccountId: () => "primary",
@@ -156,7 +161,10 @@ function makeSourceAwareUnavailablePlugin(): ChannelPlugin {
       isConfigured: (account) => Boolean((account as { configured?: boolean }).configured),
       isEnabled: () => true,
     },
-  });
+    actions: {
+      listActions: () => ["send"],
+    },
+  };
 }
 
 function makeSourceUnavailableResolvedAvailablePlugin(): ChannelPlugin {
@@ -206,10 +214,16 @@ function makeSourceUnavailableResolvedAvailablePlugin(): ChannelPlugin {
 }
 
 function makeHttpSlackUnavailablePlugin(): ChannelPlugin {
-  return makeDirectPlugin({
+  return {
     id: "slack",
-    label: "Slack",
-    docsPath: "/channels/slack",
+    meta: {
+      id: "slack",
+      label: "Slack",
+      selectionLabel: "Slack",
+      docsPath: "/channels/slack",
+      blurb: "test",
+    },
+    capabilities: { chatTypes: ["direct"] },
     config: {
       listAccountIds: () => ["primary"],
       defaultAccountId: () => "primary",
@@ -222,9 +236,9 @@ function makeHttpSlackUnavailablePlugin(): ChannelPlugin {
         botToken: "xoxb-http",
         signingSecret: "",
         botTokenSource: "config",
-        signingSecretSource: "config", // pragma: allowlist secret
+        signingSecretSource: "config",
         botTokenStatus: "available",
-        signingSecretStatus: "configured_unavailable", // pragma: allowlist secret
+        signingSecretStatus: "configured_unavailable",
       }),
       resolveAccount: () => ({
         name: "Primary",
@@ -234,21 +248,30 @@ function makeHttpSlackUnavailablePlugin(): ChannelPlugin {
         botToken: "xoxb-http",
         signingSecret: "",
         botTokenSource: "config",
-        signingSecretSource: "config", // pragma: allowlist secret
+        signingSecretSource: "config",
         botTokenStatus: "available",
-        signingSecretStatus: "configured_unavailable", // pragma: allowlist secret
+        signingSecretStatus: "configured_unavailable",
       }),
       isConfigured: () => true,
       isEnabled: () => true,
     },
-  });
+    actions: {
+      listActions: () => ["send"],
+    },
+  };
 }
 
 function makeTokenPlugin(): ChannelPlugin {
-  return makeDirectPlugin({
+  return {
     id: "token-only",
-    label: "TokenOnly",
-    docsPath: "/channels/token-only",
+    meta: {
+      id: "token-only",
+      label: "TokenOnly",
+      selectionLabel: "TokenOnly",
+      docsPath: "/channels/token-only",
+      blurb: "test",
+    },
+    capabilities: { chatTypes: ["direct"] },
     config: {
       listAccountIds: () => ["primary"],
       defaultAccountId: () => "primary",
@@ -260,7 +283,10 @@ function makeTokenPlugin(): ChannelPlugin {
       isConfigured: () => true,
       isEnabled: () => true,
     },
-  });
+    actions: {
+      listActions: () => ["send"],
+    },
+  };
 }
 
 describe("buildChannelsTable - mattermost token summary", () => {

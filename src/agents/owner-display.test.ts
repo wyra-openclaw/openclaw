@@ -13,7 +13,7 @@ describe("resolveOwnerDisplaySetting", () => {
 
     expect(resolveOwnerDisplaySetting(cfg)).toEqual({
       ownerDisplay: "hash",
-      ownerDisplaySecret: "owner-secret", // pragma: allowlist secret
+      ownerDisplaySecret: "owner-secret",
     });
   });
 
@@ -38,7 +38,7 @@ describe("resolveOwnerDisplaySetting", () => {
     const cfg = {
       commands: {
         ownerDisplay: "raw",
-        ownerDisplaySecret: "owner-secret", // pragma: allowlist secret
+        ownerDisplaySecret: "owner-secret",
       },
     } as OpenClawConfig;
 
@@ -67,7 +67,7 @@ describe("ensureOwnerDisplaySecret", () => {
     const cfg = {
       commands: {
         ownerDisplay: "hash",
-        ownerDisplaySecret: "existing-owner-secret", // pragma: allowlist secret
+        ownerDisplaySecret: "existing-owner-secret",
       },
     } as OpenClawConfig;
 

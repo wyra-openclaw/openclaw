@@ -101,12 +101,6 @@ export type OpenClawConfig = {
   bindings?: AgentBinding[];
   broadcast?: BroadcastConfig;
   audio?: AudioConfig;
-  media?: {
-    /** Preserve original uploaded filenames when storing inbound media. */
-    preserveFilenames?: boolean;
-    /** Optional retention window for persisted inbound media cleanup. */
-    ttlHours?: number;
-  };
   messages?: MessagesConfig;
   commands?: CommandsConfig;
   approvals?: ApprovalsConfig;

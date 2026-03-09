@@ -14,7 +14,6 @@ export type GatewayServiceCommand = {
   programArguments: string[];
   workingDirectory?: string;
   environment?: Record<string, string>;
-  environmentValueSources?: Record<string, "inline" | "file">;
   sourcePath?: string;
 } | null;
 
@@ -36,7 +35,6 @@ export const SERVICE_AUDIT_CODES = {
   gatewayPathMissing: "gateway-path-missing",
   gatewayPathMissingDirs: "gateway-path-missing-dirs",
   gatewayPathNonMinimal: "gateway-path-nonminimal",
-  gatewayTokenEmbedded: "gateway-token-embedded",
   gatewayTokenMismatch: "gateway-token-mismatch",
   gatewayRuntimeBun: "gateway-runtime-bun",
   gatewayRuntimeNodeVersionManager: "gateway-runtime-node-version-manager",
@@ -210,37 +208,21 @@ function auditGatewayToken(
   issues: ServiceConfigIssue[],
   expectedGatewayToken?: string,
 ) {
-  const serviceToken = readEmbeddedGatewayToken(command);
-  if (!serviceToken) {
+  const expectedToken = expectedGatewayToken?.trim();
+  if (!expectedToken) {
     return;
   }
-  issues.push({
-    code: SERVICE_AUDIT_CODES.gatewayTokenEmbedded,
-    message: "Gateway service embeds OPENCLAW_GATEWAY_TOKEN and should be reinstalled.",
-    detail: "Run `openclaw gateway install --force` to remove embedded service token.",
-    level: "recommended",
-  });
-  const expectedToken = expectedGatewayToken?.trim();
-  if (!expectedToken || serviceToken === expectedToken) {
+  const serviceToken = command?.environment?.OPENCLAW_GATEWAY_TOKEN?.trim();
+  if (serviceToken === expectedToken) {
     return;
   }
   issues.push({
     code: SERVICE_AUDIT_CODES.gatewayTokenMismatch,
     message:
       "Gateway service OPENCLAW_GATEWAY_TOKEN does not match gateway.auth.token in openclaw.json",
-    detail: "service token is stale",
+    detail: serviceToken ? "service token is stale" : "service token is missing",
     level: "recommended",
   });
-}
-
-export function readEmbeddedGatewayToken(command: GatewayServiceCommand): string | undefined {
-  if (!command) {
-    return undefined;
-  }
-  if (command.environmentValueSources?.OPENCLAW_GATEWAY_TOKEN === "file") {
-    return undefined;
-  }
-  return command.environment?.OPENCLAW_GATEWAY_TOKEN?.trim() || undefined;
 }
 
 function getPathModule(platform: NodeJS.Platform) {
@@ -378,14 +360,14 @@ export function checkTokenDrift(params: {
   serviceToken: string | undefined;
   configToken: string | undefined;
 }): ServiceConfigIssue | null {
-  const serviceToken = params.serviceToken?.trim() || undefined;
-  const configToken = params.configToken?.trim() || undefined;
+  const { serviceToken, configToken } = params;
 
-  // Tokenless service units are canonical; no drift to report.
-  if (!serviceToken) {
+  // No drift if both are undefined/empty
+  if (!serviceToken && !configToken) {
     return null;
   }
 
+  // Drift: config has token, service has different or no token
   if (configToken && serviceToken !== configToken) {
     return {
       code: SERVICE_AUDIT_CODES.gatewayTokenDrift,

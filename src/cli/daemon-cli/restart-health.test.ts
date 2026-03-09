@@ -46,26 +46,6 @@ async function inspectUnknownListenerFallback(params: {
   });
 }
 
-async function inspectAmbiguousOwnershipWithProbe(
-  probeResult: Awaited<ReturnType<typeof probeGateway>>,
-) {
-  const service = {
-    readRuntime: vi.fn(async () => ({ status: "running", pid: 8000 })),
-  } as unknown as GatewayService;
-
-  inspectPortUsage.mockResolvedValue({
-    port: 18789,
-    status: "busy",
-    listeners: [{ commandLine: "" }],
-    hints: [],
-  });
-  classifyPortListener.mockReturnValue("unknown");
-  probeGateway.mockResolvedValue(probeResult);
-
-  const { inspectGatewayRestart } = await import("./restart-health.js");
-  return inspectGatewayRestart({ service, port: 18789 });
-}
-
 describe("inspectGatewayRestart", () => {
   beforeEach(() => {
     inspectPortUsage.mockReset();
@@ -179,10 +159,24 @@ describe("inspectGatewayRestart", () => {
   });
 
   it("uses a local gateway probe when ownership is ambiguous", async () => {
-    const snapshot = await inspectAmbiguousOwnershipWithProbe({
+    const service = {
+      readRuntime: vi.fn(async () => ({ status: "running", pid: 8000 })),
+    } as unknown as GatewayService;
+
+    inspectPortUsage.mockResolvedValue({
+      port: 18789,
+      status: "busy",
+      listeners: [{ commandLine: "" }],
+      hints: [],
+    });
+    classifyPortListener.mockReturnValue("unknown");
+    probeGateway.mockResolvedValue({
       ok: true,
       close: null,
     });
+
+    const { inspectGatewayRestart } = await import("./restart-health.js");
+    const snapshot = await inspectGatewayRestart({ service, port: 18789 });
 
     expect(snapshot.healthy).toBe(true);
     expect(probeGateway).toHaveBeenCalledWith(
@@ -191,15 +185,6 @@ describe("inspectGatewayRestart", () => {
   });
 
   it("treats auth-closed probe as healthy gateway reachability", async () => {
-    const snapshot = await inspectAmbiguousOwnershipWithProbe({
-      ok: false,
-      close: { code: 1008, reason: "auth required" },
-    });
-
-    expect(snapshot.healthy).toBe(true);
-  });
-
-  it("treats busy ports with unavailable listener details as healthy when runtime is running", async () => {
     const service = {
       readRuntime: vi.fn(async () => ({ status: "running", pid: 8000 })),
     } as unknown as GatewayService;
@@ -207,17 +192,18 @@ describe("inspectGatewayRestart", () => {
     inspectPortUsage.mockResolvedValue({
       port: 18789,
       status: "busy",
-      listeners: [],
-      hints: [
-        "Port is in use but process details are unavailable (install lsof or run as an admin user).",
-      ],
-      errors: ["Error: spawn lsof ENOENT"],
+      listeners: [{ commandLine: "" }],
+      hints: [],
+    });
+    classifyPortListener.mockReturnValue("unknown");
+    probeGateway.mockResolvedValue({
+      ok: false,
+      close: { code: 1008, reason: "auth required" },
     });
 
     const { inspectGatewayRestart } = await import("./restart-health.js");
     const snapshot = await inspectGatewayRestart({ service, port: 18789 });
 
     expect(snapshot.healthy).toBe(true);
-    expect(probeGateway).not.toHaveBeenCalled();
   });
 });

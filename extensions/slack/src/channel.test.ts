@@ -144,7 +144,7 @@ describe("slackPlugin config", () => {
         slack: {
           mode: "http",
           botToken: "xoxb-http",
-          signingSecret: "secret-http", // pragma: allowlist secret
+          signingSecret: "secret-http",
         },
       },
     };
@@ -214,9 +214,9 @@ describe("slackPlugin config", () => {
         configured: true,
         mode: "http",
         botTokenStatus: "available",
-        signingSecretStatus: "configured_unavailable", // pragma: allowlist secret
+        signingSecretStatus: "configured_unavailable",
         botTokenSource: "config",
-        signingSecretSource: "config", // pragma: allowlist secret
+        signingSecretSource: "config",
         config: {
           mode: "http",
           botToken: "xoxb-http",

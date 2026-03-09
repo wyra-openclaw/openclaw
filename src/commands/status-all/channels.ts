@@ -177,10 +177,7 @@ const buildAccountNotes = (params: {
   if (snapshot.appTokenSource && snapshot.appTokenSource !== "none") {
     notes.push(`app:${snapshot.appTokenSource}`);
   }
-  if (
-    snapshot.signingSecretSource &&
-    snapshot.signingSecretSource !== "none" /* pragma: allowlist secret */
-  ) {
+  if (snapshot.signingSecretSource && snapshot.signingSecretSource !== "none") {
     notes.push(`signing:${snapshot.signingSecretSource}`);
   }
   if (hasConfiguredUnavailableCredentialStatus(entry.account)) {

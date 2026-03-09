@@ -1,11 +1,11 @@
+import { isAllowedParsedChatSender } from "../plugin-sdk/allow-from.js";
 import { normalizeE164 } from "../utils.js";
 import {
-  createAllowedChatSenderMatcher,
-  type ChatSenderAllowParams,
   type ParsedChatTarget,
+  parseChatAllowTargetPrefixes,
   parseChatTargetPrefixesOrThrow,
-  resolveServicePrefixedChatTarget,
-  resolveServicePrefixedOrChatAllowTarget,
+  resolveServicePrefixedAllowTarget,
+  resolveServicePrefixedTarget,
 } from "./target-parsing-helpers.js";
 
 export type IMessageService = "imessage" | "sms" | "auto";
@@ -80,13 +80,14 @@ export function parseIMessageTarget(raw: string): IMessageTarget {
   }
   const lower = trimmed.toLowerCase();
 
-  const servicePrefixed = resolveServicePrefixedChatTarget({
+  const servicePrefixed = resolveServicePrefixedTarget({
     trimmed,
     lower,
     servicePrefixes: SERVICE_PREFIXES,
-    chatIdPrefixes: CHAT_ID_PREFIXES,
-    chatGuidPrefixes: CHAT_GUID_PREFIXES,
-    chatIdentifierPrefixes: CHAT_IDENTIFIER_PREFIXES,
+    isChatTarget: (remainderLower) =>
+      CHAT_ID_PREFIXES.some((p) => remainderLower.startsWith(p)) ||
+      CHAT_GUID_PREFIXES.some((p) => remainderLower.startsWith(p)) ||
+      CHAT_IDENTIFIER_PREFIXES.some((p) => remainderLower.startsWith(p)),
     parseTarget: parseIMessageTarget,
   });
   if (servicePrefixed) {
@@ -114,29 +115,46 @@ export function parseIMessageAllowTarget(raw: string): IMessageAllowTarget {
   }
   const lower = trimmed.toLowerCase();
 
-  const servicePrefixed = resolveServicePrefixedOrChatAllowTarget({
+  const servicePrefixed = resolveServicePrefixedAllowTarget({
     trimmed,
     lower,
     servicePrefixes: SERVICE_PREFIXES,
     parseAllowTarget: parseIMessageAllowTarget,
-    chatIdPrefixes: CHAT_ID_PREFIXES,
-    chatGuidPrefixes: CHAT_GUID_PREFIXES,
-    chatIdentifierPrefixes: CHAT_IDENTIFIER_PREFIXES,
   });
   if (servicePrefixed) {
     return servicePrefixed;
   }
 
+  const chatTarget = parseChatAllowTargetPrefixes({
+    trimmed,
+    lower,
+    chatIdPrefixes: CHAT_ID_PREFIXES,
+    chatGuidPrefixes: CHAT_GUID_PREFIXES,
+    chatIdentifierPrefixes: CHAT_IDENTIFIER_PREFIXES,
+  });
+  if (chatTarget) {
+    return chatTarget;
+  }
+
   return { kind: "handle", handle: normalizeIMessageHandle(trimmed) };
 }
 
-const isAllowedIMessageSenderMatcher = createAllowedChatSenderMatcher({
-  normalizeSender: normalizeIMessageHandle,
-  parseAllowTarget: parseIMessageAllowTarget,
-});
-
-export function isAllowedIMessageSender(params: ChatSenderAllowParams): boolean {
-  return isAllowedIMessageSenderMatcher(params);
+export function isAllowedIMessageSender(params: {
+  allowFrom: Array<string | number>;
+  sender: string;
+  chatId?: number | null;
+  chatGuid?: string | null;
+  chatIdentifier?: string | null;
+}): boolean {
+  return isAllowedParsedChatSender({
+    allowFrom: params.allowFrom,
+    sender: params.sender,
+    chatId: params.chatId,
+    chatGuid: params.chatGuid,
+    chatIdentifier: params.chatIdentifier,
+    normalizeSender: normalizeIMessageHandle,
+    parseAllowTarget: parseIMessageAllowTarget,
+  });
 }
 
 export function formatIMessageChatTarget(chatId?: number | null): string {

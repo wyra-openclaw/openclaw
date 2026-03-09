@@ -1,7 +1,8 @@
 import type { Command } from "commander";
+import { danger } from "../../globals.js";
 import { defaultRuntime } from "../../runtime.js";
 import { addGatewayClientOptions, callGatewayFromCli } from "../gateway-rpc.js";
-import { handleCronCliError, printCronJson, warnIfCronSchedulerDisabled } from "./shared.js";
+import { warnIfCronSchedulerDisabled } from "./shared.js";
 
 function registerCronToggleCommand(params: {
   cron: Command;
@@ -20,10 +21,11 @@ function registerCronToggleCommand(params: {
             id,
             patch: { enabled: params.enabled },
           });
-          printCronJson(res);
+          defaultRuntime.log(JSON.stringify(res, null, 2));
           await warnIfCronSchedulerDisabled(opts);
         } catch (err) {
-          handleCronCliError(err);
+          defaultRuntime.error(danger(String(err)));
+          defaultRuntime.exit(1);
         }
       }),
   );
@@ -41,9 +43,10 @@ export function registerCronSimpleCommands(cron: Command) {
       .action(async (id, opts) => {
         try {
           const res = await callGatewayFromCli("cron.remove", opts, { id });
-          printCronJson(res);
+          defaultRuntime.log(JSON.stringify(res, null, 2));
         } catch (err) {
-          handleCronCliError(err);
+          defaultRuntime.error(danger(String(err)));
+          defaultRuntime.exit(1);
         }
       }),
   );
@@ -76,9 +79,10 @@ export function registerCronSimpleCommands(cron: Command) {
             id,
             limit,
           });
-          printCronJson(res);
+          defaultRuntime.log(JSON.stringify(res, null, 2));
         } catch (err) {
-          handleCronCliError(err);
+          defaultRuntime.error(danger(String(err)));
+          defaultRuntime.exit(1);
         }
       }),
   );
@@ -98,11 +102,12 @@ export function registerCronSimpleCommands(cron: Command) {
             id,
             mode: opts.due ? "due" : "force",
           });
-          printCronJson(res);
-          const result = res as { ok?: boolean; ran?: boolean; enqueued?: boolean } | undefined;
-          defaultRuntime.exit(result?.ok && (result?.ran || result?.enqueued) ? 0 : 1);
+          defaultRuntime.log(JSON.stringify(res, null, 2));
+          const result = res as { ok?: boolean; ran?: boolean } | undefined;
+          defaultRuntime.exit(result?.ok && result?.ran ? 0 : 1);
         } catch (err) {
-          handleCronCliError(err);
+          defaultRuntime.error(danger(String(err)));
+          defaultRuntime.exit(1);
         }
       }),
   );

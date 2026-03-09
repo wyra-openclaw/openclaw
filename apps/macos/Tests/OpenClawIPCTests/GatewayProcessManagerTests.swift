@@ -6,7 +6,7 @@ import Testing
 @Suite(.serialized)
 @MainActor
 struct GatewayProcessManagerTests {
-    @Test func `clears last failure when health succeeds`() async throws {
+    @Test func clearsLastFailureWhenHealthSucceeds() async throws {
         let session = GatewayTestWebSocketSession(
             taskFactory: {
                 GatewayTestWebSocketTask(

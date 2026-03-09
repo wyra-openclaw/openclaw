@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { InputFile, webhookCallback } from "grammy";
+import { webhookCallback } from "grammy";
 import type { OpenClawConfig } from "../config/config.js";
 import { isDiagnosticsEnabled } from "../infra/diagnostic-events.js";
 import { formatErrorMessage } from "../infra/errors.js";
@@ -87,7 +87,6 @@ export async function startTelegramWebhook(opts: {
   abortSignal?: AbortSignal;
   healthPath?: string;
   publicUrl?: string;
-  webhookCertPath?: string;
 }) {
   const path = opts.path ?? "/telegram-webhook";
   const healthPath = opts.healthPath ?? "/healthz";
@@ -242,7 +241,6 @@ export async function startTelegramWebhook(opts: {
         bot.api.setWebhook(publicUrl, {
           secret_token: secret,
           allowed_updates: resolveTelegramAllowedUpdates(),
-          certificate: opts.webhookCertPath ? new InputFile(opts.webhookCertPath) : undefined,
         }),
     });
   } catch (err) {

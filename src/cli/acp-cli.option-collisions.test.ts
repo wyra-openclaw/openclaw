@@ -13,8 +13,6 @@ const defaultRuntime = {
   exit: vi.fn(),
 };
 
-const passwordKey = () => ["pass", "word"].join("");
-
 vi.mock("../acp/client.js", () => ({
   runAcpClientInteractive: (opts: unknown) => runAcpClientInteractive(opts),
 }));
@@ -93,8 +91,7 @@ describe("acp cli option collisions", () => {
   });
 
   it("loads gateway token/password from files", async () => {
-    await withSecretFiles({ token: "tok_file\n", [passwordKey()]: "pw_file\n" }, async (files) => {
-      // pragma: allowlist secret
+    await withSecretFiles({ token: "tok_file\n", password: "pw_file\n" }, async (files) => {
       await parseAcp([
         "--token-file",
         files.tokenFile ?? "",
@@ -106,7 +103,7 @@ describe("acp cli option collisions", () => {
     expect(serveAcpGateway).toHaveBeenCalledWith(
       expect.objectContaining({
         gatewayToken: "tok_file",
-        gatewayPassword: "pw_file", // pragma: allowlist secret
+        gatewayPassword: "pw_file",
       }),
     );
   });
@@ -120,8 +117,7 @@ describe("acp cli option collisions", () => {
   });
 
   it("rejects mixed password flags and file flags", async () => {
-    const passwordFileValue = "pw_file\n"; // pragma: allowlist secret
-    await withSecretFiles({ password: passwordFileValue }, async (files) => {
+    await withSecretFiles({ password: "pw_file\n" }, async (files) => {
       await parseAcp(["--password", "pw_inline", "--password-file", files.passwordFile ?? ""]);
     });
 
@@ -153,6 +149,6 @@ describe("acp cli option collisions", () => {
 
   it("reports missing token-file read errors", async () => {
     await parseAcp(["--token-file", "/tmp/openclaw-acp-missing-token.txt"]);
-    expectCliError(/Failed to (inspect|read) Gateway token file/);
+    expectCliError(/Failed to read Gateway token file/);
   });
 });

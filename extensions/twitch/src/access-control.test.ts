@@ -51,10 +51,14 @@ describe("checkTwitchAccessControl", () => {
 
   describe("when no restrictions are configured", () => {
     it("allows messages that mention the bot (default requireMention)", () => {
-      const result = runAccessCheck({
-        message: {
-          message: "@testbot hello",
-        },
+      const message: TwitchChatMessage = {
+        ...mockMessage,
+        message: "@testbot hello",
+      };
+      const result = checkTwitchAccessControl({
+        message,
+        account: mockAccount,
+        botUsername: "testbot",
       });
       expect(result.allowed).toBe(true);
     });
@@ -62,20 +66,30 @@ describe("checkTwitchAccessControl", () => {
 
   describe("requireMention default", () => {
     it("defaults to true when undefined", () => {
-      const result = runAccessCheck({
-        message: {
-          message: "hello bot",
-        },
+      const message: TwitchChatMessage = {
+        ...mockMessage,
+        message: "hello bot",
+      };
+
+      const result = checkTwitchAccessControl({
+        message,
+        account: mockAccount,
+        botUsername: "testbot",
       });
       expect(result.allowed).toBe(false);
       expect(result.reason).toContain("does not mention the bot");
     });
 
     it("allows mention when requireMention is undefined", () => {
-      const result = runAccessCheck({
-        message: {
-          message: "@testbot hello",
-        },
+      const message: TwitchChatMessage = {
+        ...mockMessage,
+        message: "@testbot hello",
+      };
+
+      const result = checkTwitchAccessControl({
+        message,
+        account: mockAccount,
+        botUsername: "testbot",
       });
       expect(result.allowed).toBe(true);
     });
@@ -83,25 +97,52 @@ describe("checkTwitchAccessControl", () => {
 
   describe("requireMention", () => {
     it("allows messages that mention the bot", () => {
-      const result = runAccessCheck({
-        account: { requireMention: true },
-        message: { message: "@testbot hello" },
+      const account: TwitchAccountConfig = {
+        ...mockAccount,
+        requireMention: true,
+      };
+      const message: TwitchChatMessage = {
+        ...mockMessage,
+        message: "@testbot hello",
+      };
+
+      const result = checkTwitchAccessControl({
+        message,
+        account,
+        botUsername: "testbot",
       });
       expect(result.allowed).toBe(true);
     });
 
     it("blocks messages that don't mention the bot", () => {
-      const result = runAccessCheck({
-        account: { requireMention: true },
+      const account: TwitchAccountConfig = {
+        ...mockAccount,
+        requireMention: true,
+      };
+
+      const result = checkTwitchAccessControl({
+        message: mockMessage,
+        account,
+        botUsername: "testbot",
       });
       expect(result.allowed).toBe(false);
       expect(result.reason).toContain("does not mention the bot");
     });
 
     it("is case-insensitive for bot username", () => {
-      const result = runAccessCheck({
-        account: { requireMention: true },
-        message: { message: "@TestBot hello" },
+      const account: TwitchAccountConfig = {
+        ...mockAccount,
+        requireMention: true,
+      };
+      const message: TwitchChatMessage = {
+        ...mockMessage,
+        message: "@TestBot hello",
+      };
+
+      const result = checkTwitchAccessControl({
+        message,
+        account,
+        botUsername: "testbot",
       });
       expect(result.allowed).toBe(true);
     });

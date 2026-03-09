@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { gatewayStatusCommand } from "../../commands/gateway-status.js";
 import { formatHealthChannelLines, type HealthSummary } from "../../commands/health.js";
-import { readBestEffortConfig } from "../../config/config.js";
+import { loadConfig } from "../../config/config.js";
 import { discoverGatewayBeacons } from "../../infra/bonjour-discovery.js";
 import type { CostUsageSummary } from "../../infra/session-cost-usage.js";
 import { resolveWideAreaDiscoveryDomain } from "../../infra/widearea-dns.js";
@@ -120,9 +120,8 @@ export function registerGatewayCli(program: Command) {
       .action(async (method, opts, command) => {
         await runGatewayCommand(async () => {
           const rpcOpts = resolveGatewayRpcOptions(opts, command);
-          const config = await readBestEffortConfig();
           const params = JSON.parse(String(opts.params ?? "{}"));
-          const result = await callGatewayCli(method, { ...rpcOpts, config }, params);
+          const result = await callGatewayCli(method, rpcOpts, params);
           if (rpcOpts.json) {
             defaultRuntime.log(JSON.stringify(result, null, 2));
             return;
@@ -145,8 +144,7 @@ export function registerGatewayCli(program: Command) {
         await runGatewayCommand(async () => {
           const rpcOpts = resolveGatewayRpcOptions(opts, command);
           const days = parseDaysOption(opts.days);
-          const config = await readBestEffortConfig();
-          const result = await callGatewayCli("usage.cost", { ...rpcOpts, config }, { days });
+          const result = await callGatewayCli("usage.cost", rpcOpts, { days });
           if (rpcOpts.json) {
             defaultRuntime.log(JSON.stringify(result, null, 2));
             return;
@@ -167,8 +165,7 @@ export function registerGatewayCli(program: Command) {
       .action(async (opts, command) => {
         await runGatewayCommand(async () => {
           const rpcOpts = resolveGatewayRpcOptions(opts, command);
-          const config = await readBestEffortConfig();
-          const result = await callGatewayCli("health", { ...rpcOpts, config });
+          const result = await callGatewayCli("health", rpcOpts);
           if (rpcOpts.json) {
             defaultRuntime.log(JSON.stringify(result, null, 2));
             return;
@@ -214,7 +211,7 @@ export function registerGatewayCli(program: Command) {
     .option("--json", "Output JSON", false)
     .action(async (opts: GatewayDiscoverOpts) => {
       await runGatewayCommand(async () => {
-        const cfg = await readBestEffortConfig();
+        const cfg = loadConfig();
         const wideAreaDomain = resolveWideAreaDiscoveryDomain({
           configDomain: cfg.discovery?.wideArea?.domain,
         });

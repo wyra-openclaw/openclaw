@@ -197,7 +197,7 @@ See [Pi USB boot guide](https://www.raspberrypi.com/documentation/computers/rasp
 On lower-power Pi hosts, enable Node's module compile cache so repeated CLI runs are faster:
 
 ```bash
-grep -q 'NODE_COMPILE_CACHE=/var/tmp/openclaw-compile-cache' ~/.bashrc || cat >> ~/.bashrc <<'EOF' # pragma: allowlist secret
+grep -q 'NODE_COMPILE_CACHE=/var/tmp/openclaw-compile-cache' ~/.bashrc || cat >> ~/.bashrc <<'EOF'
 export NODE_COMPILE_CACHE=/var/tmp/openclaw-compile-cache
 mkdir -p /var/tmp/openclaw-compile-cache
 export OPENCLAW_NO_RESPAWN=1

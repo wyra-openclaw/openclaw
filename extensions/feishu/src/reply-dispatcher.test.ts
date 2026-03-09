@@ -106,28 +106,6 @@ describe("createFeishuReplyDispatcher streaming behavior", () => {
     });
   });
 
-  function setupNonStreamingAutoDispatcher() {
-    resolveFeishuAccountMock.mockReturnValue({
-      accountId: "main",
-      appId: "app_id",
-      appSecret: "app_secret",
-      domain: "feishu",
-      config: {
-        renderMode: "auto",
-        streaming: false,
-      },
-    });
-
-    createFeishuReplyDispatcher({
-      cfg: {} as never,
-      agentId: "agent",
-      runtime: { log: vi.fn(), error: vi.fn() } as never,
-      chatId: "oc_chat",
-    });
-
-    return createReplyDispatcherWithTypingMock.mock.calls[0]?.[0];
-  }
-
   it("skips typing indicator when account typingIndicator is disabled", async () => {
     resolveFeishuAccountMock.mockReturnValue({
       accountId: "main",
@@ -241,17 +219,6 @@ describe("createFeishuReplyDispatcher streaming behavior", () => {
     expect(sendMediaFeishuMock).not.toHaveBeenCalled();
   });
 
-  it("sets disableBlockStreaming in replyOptions to prevent silent reply drops", async () => {
-    const result = createFeishuReplyDispatcher({
-      cfg: {} as never,
-      agentId: "agent",
-      runtime: {} as never,
-      chatId: "oc_chat",
-    });
-
-    expect(result.replyOptions).toHaveProperty("disableBlockStreaming", true);
-  });
-
   it("uses streaming session for auto mode markdown payloads", async () => {
     createFeishuReplyDispatcher({
       cfg: {} as never,
@@ -334,7 +301,25 @@ describe("createFeishuReplyDispatcher streaming behavior", () => {
     expect(sendMarkdownCardFeishuMock).not.toHaveBeenCalled();
   });
   it("suppresses duplicate final text while still sending media", async () => {
-    const options = setupNonStreamingAutoDispatcher();
+    resolveFeishuAccountMock.mockReturnValue({
+      accountId: "main",
+      appId: "app_id",
+      appSecret: "app_secret",
+      domain: "feishu",
+      config: {
+        renderMode: "auto",
+        streaming: false,
+      },
+    });
+
+    createFeishuReplyDispatcher({
+      cfg: {} as never,
+      agentId: "agent",
+      runtime: { log: vi.fn(), error: vi.fn() } as never,
+      chatId: "oc_chat",
+    });
+
+    const options = createReplyDispatcherWithTypingMock.mock.calls[0]?.[0];
     await options.deliver({ text: "plain final" }, { kind: "final" });
     await options.deliver(
       { text: "plain final", mediaUrl: "https://example.com/a.png" },
@@ -356,7 +341,25 @@ describe("createFeishuReplyDispatcher streaming behavior", () => {
   });
 
   it("keeps distinct non-streaming final payloads", async () => {
-    const options = setupNonStreamingAutoDispatcher();
+    resolveFeishuAccountMock.mockReturnValue({
+      accountId: "main",
+      appId: "app_id",
+      appSecret: "app_secret",
+      domain: "feishu",
+      config: {
+        renderMode: "auto",
+        streaming: false,
+      },
+    });
+
+    createFeishuReplyDispatcher({
+      cfg: {} as never,
+      agentId: "agent",
+      runtime: { log: vi.fn(), error: vi.fn() } as never,
+      chatId: "oc_chat",
+    });
+
+    const options = createReplyDispatcherWithTypingMock.mock.calls[0]?.[0];
     await options.deliver({ text: "notice header" }, { kind: "final" });
     await options.deliver({ text: "actual answer body" }, { kind: "final" });
 

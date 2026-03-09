@@ -1,5 +1,4 @@
 import type { OpenClawConfig } from "../config/config.js";
-import { normalizeStringEntries } from "../shared/string-normalization.js";
 import { projectSafeChannelAccountSnapshotFields } from "./account-snapshot-fields.js";
 import type { ChannelAccountSnapshot } from "./plugins/types.core.js";
 import type { ChannelPlugin } from "./plugins/types.plugin.js";
@@ -35,7 +34,7 @@ export function formatChannelAllowFrom(params: {
       allowFrom: params.allowFrom,
     });
   }
-  return normalizeStringEntries(params.allowFrom);
+  return params.allowFrom.map((entry) => String(entry).trim()).filter(Boolean);
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {

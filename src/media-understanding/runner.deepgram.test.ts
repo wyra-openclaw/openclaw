@@ -29,10 +29,7 @@ describe("runCapability deepgram provider options", () => {
             deepgram: {
               baseUrl: "https://provider.example",
               apiKey: "test-key",
-              headers: {
-                "X-Provider": "1",
-                "X-Provider-Managed": "secretref-managed",
-              },
+              headers: { "X-Provider": "1" },
               models: [],
             },
           },
@@ -42,10 +39,7 @@ describe("runCapability deepgram provider options", () => {
             audio: {
               enabled: true,
               baseUrl: "https://config.example",
-              headers: {
-                "X-Config": "2",
-                "X-Config-Managed": "secretref-env:DEEPGRAM_HEADER_TOKEN",
-              },
+              headers: { "X-Config": "2" },
               providerOptions: {
                 deepgram: {
                   detect_language: true,
@@ -58,10 +52,7 @@ describe("runCapability deepgram provider options", () => {
                   provider: "deepgram",
                   model: "nova-3",
                   baseUrl: "https://entry.example",
-                  headers: {
-                    "X-Entry": "3",
-                    "X-Entry-Managed": "secretref-managed",
-                  },
+                  headers: { "X-Entry": "3" },
                   providerOptions: {
                     deepgram: {
                       detectLanguage: false,
@@ -88,11 +79,8 @@ describe("runCapability deepgram provider options", () => {
       expect(seenBaseUrl).toBe("https://entry.example");
       expect(seenHeaders).toMatchObject({
         "X-Provider": "1",
-        "X-Provider-Managed": "secretref-managed",
         "X-Config": "2",
-        "X-Config-Managed": "secretref-env:DEEPGRAM_HEADER_TOKEN",
         "X-Entry": "3",
-        "X-Entry-Managed": "secretref-managed",
       });
       expect(seenQuery).toMatchObject({
         detect_language: false,

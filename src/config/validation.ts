@@ -285,7 +285,7 @@ export function validateConfigObject(
   };
 }
 
-type ValidateConfigWithPluginsResult =
+export function validateConfigObjectWithPlugins(raw: unknown):
   | {
       ok: true;
       config: OpenClawConfig;
@@ -295,20 +295,38 @@ type ValidateConfigWithPluginsResult =
       ok: false;
       issues: ConfigValidationIssue[];
       warnings: ConfigValidationIssue[];
-    };
-
-export function validateConfigObjectWithPlugins(raw: unknown): ValidateConfigWithPluginsResult {
+    } {
   return validateConfigObjectWithPluginsBase(raw, { applyDefaults: true });
 }
 
-export function validateConfigObjectRawWithPlugins(raw: unknown): ValidateConfigWithPluginsResult {
+export function validateConfigObjectRawWithPlugins(raw: unknown):
+  | {
+      ok: true;
+      config: OpenClawConfig;
+      warnings: ConfigValidationIssue[];
+    }
+  | {
+      ok: false;
+      issues: ConfigValidationIssue[];
+      warnings: ConfigValidationIssue[];
+    } {
   return validateConfigObjectWithPluginsBase(raw, { applyDefaults: false });
 }
 
 function validateConfigObjectWithPluginsBase(
   raw: unknown,
   opts: { applyDefaults: boolean },
-): ValidateConfigWithPluginsResult {
+):
+  | {
+      ok: true;
+      config: OpenClawConfig;
+      warnings: ConfigValidationIssue[];
+    }
+  | {
+      ok: false;
+      issues: ConfigValidationIssue[];
+      warnings: ConfigValidationIssue[];
+    } {
   const base = opts.applyDefaults ? validateConfigObject(raw) : validateConfigObjectRaw(raw);
   if (!base.ok) {
     return { ok: false, issues: base.issues, warnings: [] };

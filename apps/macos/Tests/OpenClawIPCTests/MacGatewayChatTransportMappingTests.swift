@@ -3,8 +3,8 @@ import OpenClawProtocol
 import Testing
 @testable import OpenClaw
 
-struct MacGatewayChatTransportMappingTests {
-    @Test func `snapshot maps to health`() {
+@Suite struct MacGatewayChatTransportMappingTests {
+    @Test func snapshotMapsToHealth() {
         let snapshot = Snapshot(
             presence: [],
             health: OpenClawProtocol.AnyCodable(["ok": OpenClawProtocol.AnyCodable(false)]),
@@ -35,7 +35,7 @@ struct MacGatewayChatTransportMappingTests {
         }
     }
 
-    @Test func `health event maps to health`() {
+    @Test func healthEventMapsToHealth() {
         let frame = EventFrame(
             type: "event",
             event: "health",
@@ -52,7 +52,7 @@ struct MacGatewayChatTransportMappingTests {
         }
     }
 
-    @Test func `tick event maps to tick`() {
+    @Test func tickEventMapsToTick() {
         let frame = EventFrame(type: "event", event: "tick", payload: nil, seq: 1, stateversion: nil)
         let mapped = MacGatewayChatTransport.mapPushToTransportEvent(.event(frame))
         #expect({
@@ -61,7 +61,7 @@ struct MacGatewayChatTransportMappingTests {
         }())
     }
 
-    @Test func `chat event maps to chat`() {
+    @Test func chatEventMapsToChat() {
         let payload = OpenClawProtocol.AnyCodable([
             "runId": OpenClawProtocol.AnyCodable("run-1"),
             "sessionKey": OpenClawProtocol.AnyCodable("main"),
@@ -80,7 +80,7 @@ struct MacGatewayChatTransportMappingTests {
         }
     }
 
-    @Test func `unknown event maps to nil`() {
+    @Test func unknownEventMapsToNil() {
         let frame = EventFrame(
             type: "event",
             event: "unknown",
@@ -91,7 +91,7 @@ struct MacGatewayChatTransportMappingTests {
         #expect(mapped == nil)
     }
 
-    @Test func `seq gap maps to seq gap`() {
+    @Test func seqGapMapsToSeqGap() {
         let mapped = MacGatewayChatTransport.mapPushToTransportEvent(.seqGap(expected: 1, received: 9))
         #expect({
             if case .seqGap = mapped { return true }

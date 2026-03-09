@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SecretInput } from "../config/types.secrets.js";
 import { encodePairingSetupCode, resolvePairingSetupFromConfig } from "./setup-code.js";
 
 describe("pairing setup code", () => {
@@ -72,7 +71,7 @@ describe("pairing setup code", () => {
       },
       {
         env: {
-          GW_PASSWORD: "resolved-password", // pragma: allowlist secret
+          GW_PASSWORD: "resolved-password",
         },
       },
     );
@@ -104,7 +103,7 @@ describe("pairing setup code", () => {
       },
       {
         env: {
-          OPENCLAW_GATEWAY_PASSWORD: "password-from-env", // pragma: allowlist secret
+          OPENCLAW_GATEWAY_PASSWORD: "password-from-env",
         },
       },
     );
@@ -205,13 +204,15 @@ describe("pairing setup code", () => {
     ).rejects.toThrow(/MISSING_GW_TOKEN/i);
   });
 
-  async function resolveInferredModeWithPasswordEnv(token: SecretInput) {
-    return await resolvePairingSetupFromConfig(
+  it("uses password env in inferred mode without resolving token SecretRef", async () => {
+    const resolved = await resolvePairingSetupFromConfig(
       {
         gateway: {
           bind: "custom",
           customBindHost: "gateway.local",
-          auth: { token },
+          auth: {
+            token: { source: "env", provider: "default", id: "MISSING_GW_TOKEN" },
+          },
         },
         secrets: {
           providers: {
@@ -221,18 +222,10 @@ describe("pairing setup code", () => {
       },
       {
         env: {
-          OPENCLAW_GATEWAY_PASSWORD: "password-from-env", // pragma: allowlist secret
+          OPENCLAW_GATEWAY_PASSWORD: "password-from-env",
         },
       },
     );
-  }
-
-  it("uses password env in inferred mode without resolving token SecretRef", async () => {
-    const resolved = await resolveInferredModeWithPasswordEnv({
-      source: "env",
-      provider: "default",
-      id: "MISSING_GW_TOKEN",
-    });
 
     expect(resolved.ok).toBe(true);
     if (!resolved.ok) {
@@ -243,7 +236,27 @@ describe("pairing setup code", () => {
   });
 
   it("does not treat env-template token as plaintext in inferred mode", async () => {
-    const resolved = await resolveInferredModeWithPasswordEnv("${MISSING_GW_TOKEN}");
+    const resolved = await resolvePairingSetupFromConfig(
+      {
+        gateway: {
+          bind: "custom",
+          customBindHost: "gateway.local",
+          auth: {
+            token: "${MISSING_GW_TOKEN}",
+          },
+        },
+        secrets: {
+          providers: {
+            default: { source: "env" },
+          },
+        },
+      },
+      {
+        env: {
+          OPENCLAW_GATEWAY_PASSWORD: "password-from-env",
+        },
+      },
+    );
 
     expect(resolved.ok).toBe(true);
     if (!resolved.ok) {
@@ -275,7 +288,7 @@ describe("pairing setup code", () => {
         {
           env: {
             GW_TOKEN: "resolved-token",
-            GW_PASSWORD: "resolved-password", // pragma: allowlist secret
+            GW_PASSWORD: "resolved-password",
           },
         },
       ),
@@ -302,7 +315,7 @@ describe("pairing setup code", () => {
         },
         {
           env: {
-            GW_PASSWORD: "resolved-password", // pragma: allowlist secret
+            GW_PASSWORD: "resolved-password",
           },
         },
       ),

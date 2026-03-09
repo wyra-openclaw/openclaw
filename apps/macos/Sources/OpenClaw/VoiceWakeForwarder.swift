@@ -32,7 +32,7 @@ enum VoiceWakeForwarder {
         }
     }
 
-    struct ForwardOptions {
+    struct ForwardOptions: Sendable {
         var sessionKey: String = "main"
         var thinking: String = "low"
         var deliver: Bool = true

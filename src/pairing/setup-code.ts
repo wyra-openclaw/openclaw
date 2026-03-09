@@ -7,7 +7,8 @@ import {
   resolveSecretInputRef,
 } from "../config/types.secrets.js";
 import { assertExplicitGatewayAuthModeWhenBothConfigured } from "../gateway/auth-mode-policy.js";
-import { resolveRequiredConfiguredSecretRefInputString } from "../gateway/resolve-configured-secret-input-string.js";
+import { secretRefKey } from "../secrets/ref-contract.js";
+import { resolveSecretRefValues } from "../secrets/resolve.js";
 import { resolveGatewayBindUrl } from "../shared/gateway-bind-url.js";
 import { isCarrierGradeNatIpv4Address, isRfc1918Ipv4Address } from "../shared/net/ip.js";
 import { resolveTailnetHostWithRunner } from "../shared/tailscale-status.js";
@@ -154,16 +155,6 @@ function pickTailnetIPv4(
   return pickIPv4Matching(networkInterfaces, isTailnetIPv4);
 }
 
-function resolveGatewayTokenFromEnv(env: NodeJS.ProcessEnv): string | undefined {
-  return env.OPENCLAW_GATEWAY_TOKEN?.trim() || env.CLAWDBOT_GATEWAY_TOKEN?.trim() || undefined;
-}
-
-function resolveGatewayPasswordFromEnv(env: NodeJS.ProcessEnv): string | undefined {
-  return (
-    env.OPENCLAW_GATEWAY_PASSWORD?.trim() || env.CLAWDBOT_GATEWAY_PASSWORD?.trim() || undefined
-  );
-}
-
 function resolveAuth(cfg: OpenClawConfig, env: NodeJS.ProcessEnv): ResolveAuthResult {
   const mode = cfg.gateway?.auth?.mode;
   const defaults = cfg.secrets?.defaults;
@@ -175,12 +166,13 @@ function resolveAuth(cfg: OpenClawConfig, env: NodeJS.ProcessEnv): ResolveAuthRe
     value: cfg.gateway?.auth?.password,
     defaults,
   }).ref;
-  const envToken = resolveGatewayTokenFromEnv(env);
-  const envPassword = resolveGatewayPasswordFromEnv(env);
   const token =
-    envToken || (tokenRef ? undefined : normalizeSecretInputString(cfg.gateway?.auth?.token));
+    env.OPENCLAW_GATEWAY_TOKEN?.trim() ||
+    env.CLAWDBOT_GATEWAY_TOKEN?.trim() ||
+    (tokenRef ? undefined : normalizeSecretInputString(cfg.gateway?.auth?.token));
   const password =
-    envPassword ||
+    env.OPENCLAW_GATEWAY_PASSWORD?.trim() ||
+    env.CLAWDBOT_GATEWAY_PASSWORD?.trim() ||
     (passwordRef ? undefined : normalizeSecretInputString(cfg.gateway?.auth?.password));
 
   if (mode === "password") {
@@ -208,7 +200,17 @@ async function resolveGatewayTokenSecretRef(
   cfg: OpenClawConfig,
   env: NodeJS.ProcessEnv,
 ): Promise<OpenClawConfig> {
-  const hasTokenEnvCandidate = Boolean(resolveGatewayTokenFromEnv(env));
+  const authToken = cfg.gateway?.auth?.token;
+  const { ref } = resolveSecretInputRef({
+    value: authToken,
+    defaults: cfg.secrets?.defaults,
+  });
+  if (!ref) {
+    return cfg;
+  }
+  const hasTokenEnvCandidate = Boolean(
+    env.OPENCLAW_GATEWAY_TOKEN?.trim() || env.CLAWDBOT_GATEWAY_TOKEN?.trim(),
+  );
   if (hasTokenEnvCandidate) {
     return cfg;
   }
@@ -224,14 +226,13 @@ async function resolveGatewayTokenSecretRef(
       return cfg;
     }
   }
-  const token = await resolveRequiredConfiguredSecretRefInputString({
+  const resolved = await resolveSecretRefValues([ref], {
     config: cfg,
     env,
-    value: cfg.gateway?.auth?.token,
-    path: "gateway.auth.token",
   });
-  if (!token) {
-    return cfg;
+  const value = resolved.get(secretRefKey(ref));
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error("gateway.auth.token resolved to an empty or non-string value.");
   }
   return {
     ...cfg,
@@ -239,7 +240,7 @@ async function resolveGatewayTokenSecretRef(
       ...cfg.gateway,
       auth: {
         ...cfg.gateway?.auth,
-        token,
+        token: value.trim(),
       },
     },
   };
@@ -249,7 +250,17 @@ async function resolveGatewayPasswordSecretRef(
   cfg: OpenClawConfig,
   env: NodeJS.ProcessEnv,
 ): Promise<OpenClawConfig> {
-  const hasPasswordEnvCandidate = Boolean(resolveGatewayPasswordFromEnv(env));
+  const authPassword = cfg.gateway?.auth?.password;
+  const { ref } = resolveSecretInputRef({
+    value: authPassword,
+    defaults: cfg.secrets?.defaults,
+  });
+  if (!ref) {
+    return cfg;
+  }
+  const hasPasswordEnvCandidate = Boolean(
+    env.OPENCLAW_GATEWAY_PASSWORD?.trim() || env.CLAWDBOT_GATEWAY_PASSWORD?.trim(),
+  );
   if (hasPasswordEnvCandidate) {
     return cfg;
   }
@@ -259,20 +270,19 @@ async function resolveGatewayPasswordSecretRef(
   }
   if (mode !== "password") {
     const hasTokenCandidate =
-      Boolean(resolveGatewayTokenFromEnv(env)) ||
+      Boolean(env.OPENCLAW_GATEWAY_TOKEN?.trim() || env.CLAWDBOT_GATEWAY_TOKEN?.trim()) ||
       hasConfiguredSecretInput(cfg.gateway?.auth?.token, cfg.secrets?.defaults);
     if (hasTokenCandidate) {
       return cfg;
     }
   }
-  const password = await resolveRequiredConfiguredSecretRefInputString({
+  const resolved = await resolveSecretRefValues([ref], {
     config: cfg,
     env,
-    value: cfg.gateway?.auth?.password,
-    path: "gateway.auth.password",
   });
-  if (!password) {
-    return cfg;
+  const value = resolved.get(secretRefKey(ref));
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error("gateway.auth.password resolved to an empty or non-string value.");
   }
   return {
     ...cfg,
@@ -280,7 +290,7 @@ async function resolveGatewayPasswordSecretRef(
       ...cfg.gateway,
       auth: {
         ...cfg.gateway?.auth,
-        password,
+        password: value.trim(),
       },
     },
   };

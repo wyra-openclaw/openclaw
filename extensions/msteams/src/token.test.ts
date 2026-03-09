@@ -35,7 +35,7 @@ describe("resolveMSTeamsCredentials", () => {
 
     expect(resolved).toEqual({
       appId: "app-id",
-      appPassword: "app-password", // pragma: allowlist secret
+      appPassword: "app-password",
       tenantId: "tenant-id",
     });
   });

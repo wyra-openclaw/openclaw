@@ -1,7 +1,4 @@
-import { enqueueCommandInLane } from "../../process/command-queue.js";
-import { CommandLane } from "../../process/lanes.js";
 import type { CronJob, CronJobCreate, CronJobPatch } from "../types.js";
-import { normalizeCronCreateDeliveryInput } from "./initial-delivery.js";
 import {
   applyJobPatch,
   computeJobNextRunAtMs,
@@ -237,8 +234,7 @@ export async function add(state: CronServiceState, input: CronJobCreate) {
   return await locked(state, async () => {
     warnIfDisabled(state, "add");
     await ensureLoaded(state);
-    const normalizedInput = normalizeCronCreateDeliveryInput(input);
-    const job = createJob(state, normalizedInput);
+    const job = createJob(state, input);
     state.store?.jobs.push(job);
 
     // Defensive: recompute all next-run times to ensure consistency
@@ -341,58 +337,8 @@ export async function remove(state: CronServiceState, id: string) {
   });
 }
 
-type PreparedManualRun =
-  | {
-      ok: true;
-      ran: false;
-      reason: "already-running" | "not-due";
-    }
-  | {
-      ok: true;
-      ran: true;
-      jobId: string;
-      startedAt: number;
-      executionJob: CronJob;
-    }
-  | { ok: false };
-
-type ManualRunDisposition =
-  | Extract<PreparedManualRun, { ran: false }>
-  | { ok: true; runnable: true };
-
-let nextManualRunId = 1;
-
-async function inspectManualRunDisposition(
-  state: CronServiceState,
-  id: string,
-  mode?: "due" | "force",
-): Promise<ManualRunDisposition | { ok: false }> {
-  return await locked(state, async () => {
-    warnIfDisabled(state, "run");
-    await ensureLoaded(state, { skipRecompute: true });
-    // Normalize job tick state (clears stale runningAtMs markers) before
-    // checking if already running, so a stale marker from a crashed Phase-1
-    // persist does not block manual triggers for up to STUCK_RUN_MS (#17554).
-    recomputeNextRunsForMaintenance(state);
-    const job = findJobOrThrow(state, id);
-    if (typeof job.state.runningAtMs === "number") {
-      return { ok: true, ran: false, reason: "already-running" as const };
-    }
-    const now = state.deps.nowMs();
-    const due = isJobDue(job, now, { forced: mode === "force" });
-    if (!due) {
-      return { ok: true, ran: false, reason: "not-due" as const };
-    }
-    return { ok: true, runnable: true } as const;
-  });
-}
-
-async function prepareManualRun(
-  state: CronServiceState,
-  id: string,
-  mode?: "due" | "force",
-): Promise<PreparedManualRun> {
-  return await locked(state, async () => {
+export async function run(state: CronServiceState, id: string, mode?: "due" | "force") {
+  const prepared = await locked(state, async () => {
     warnIfDisabled(state, "run");
     await ensureLoaded(state, { skipRecompute: true });
     // Normalize job tick state (clears stale runningAtMs markers) before
@@ -417,7 +363,7 @@ async function prepareManualRun(
     // force-reload from disk cannot start the same job concurrently.
     await persist(state);
     emit(state, { jobId: job.id, action: "started", runAtMs: now });
-    const executionJob = JSON.parse(JSON.stringify(job)) as CronJob;
+    const executionJob = JSON.parse(JSON.stringify(job)) as typeof job;
     return {
       ok: true,
       ran: true,
@@ -426,13 +372,13 @@ async function prepareManualRun(
       executionJob,
     } as const;
   });
-}
 
-async function finishPreparedManualRun(
-  state: CronServiceState,
-  prepared: Extract<PreparedManualRun, { ran: true }>,
-  mode?: "due" | "force",
-): Promise<void> {
+  if (!prepared.ran) {
+    return prepared;
+  }
+  if (!prepared.executionJob || typeof prepared.startedAt !== "number") {
+    return { ok: false } as const;
+  }
   const executionJob = prepared.executionJob;
   const startedAt = prepared.startedAt;
   const jobId = prepared.jobId;
@@ -513,52 +459,8 @@ async function finishPreparedManualRun(
     await persist(state);
     armTimer(state);
   });
-}
 
-export async function run(state: CronServiceState, id: string, mode?: "due" | "force") {
-  const prepared = await prepareManualRun(state, id, mode);
-  if (!prepared.ok || !prepared.ran) {
-    return prepared;
-  }
-  await finishPreparedManualRun(state, prepared, mode);
   return { ok: true, ran: true } as const;
-}
-
-export async function enqueueRun(state: CronServiceState, id: string, mode?: "due" | "force") {
-  const disposition = await inspectManualRunDisposition(state, id, mode);
-  if (!disposition.ok || !("runnable" in disposition && disposition.runnable)) {
-    return disposition;
-  }
-
-  const runId = `manual:${id}:${state.deps.nowMs()}:${nextManualRunId++}`;
-  void enqueueCommandInLane(
-    CommandLane.Cron,
-    async () => {
-      const result = await run(state, id, mode);
-      if (result.ok && "ran" in result && !result.ran) {
-        state.deps.log.info(
-          { jobId: id, runId, reason: result.reason },
-          "cron: queued manual run skipped before execution",
-        );
-      }
-      return result;
-    },
-    {
-      warnAfterMs: 5_000,
-      onWait: (waitMs, queuedAhead) => {
-        state.deps.log.warn(
-          { jobId: id, runId, waitMs, queuedAhead },
-          "cron: queued manual run waiting for an execution slot",
-        );
-      },
-    },
-  ).catch((err) => {
-    state.deps.log.error(
-      { jobId: id, runId, err: String(err) },
-      "cron: queued manual run background execution failed",
-    );
-  });
-  return { ok: true, enqueued: true, runId } as const;
 }
 
 export function wakeNow(

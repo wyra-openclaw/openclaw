@@ -1,13 +1,9 @@
 import type { OpenClawConfig } from "../config/config.js";
 import { hasConfiguredSecretInput, normalizeSecretInputString } from "../config/types.secrets.js";
 import type { SlackAccountConfig } from "../config/types.slack.js";
+import { resolveAccountEntry } from "../routing/account-lookup.js";
 import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "../routing/session-key.js";
-import type { SlackAccountSurfaceFields } from "./account-surface-fields.js";
-import {
-  mergeSlackAccountConfig,
-  resolveDefaultSlackAccountId,
-  type SlackTokenSource,
-} from "./accounts.js";
+import { resolveDefaultSlackAccountId, type SlackTokenSource } from "./accounts.js";
 
 export type SlackCredentialStatus = "available" | "configured_unavailable" | "missing";
 
@@ -30,7 +26,33 @@ export type InspectedSlackAccount = {
   userTokenStatus: SlackCredentialStatus;
   configured: boolean;
   config: SlackAccountConfig;
-} & SlackAccountSurfaceFields;
+  groupPolicy?: SlackAccountConfig["groupPolicy"];
+  textChunkLimit?: SlackAccountConfig["textChunkLimit"];
+  mediaMaxMb?: SlackAccountConfig["mediaMaxMb"];
+  reactionNotifications?: SlackAccountConfig["reactionNotifications"];
+  reactionAllowlist?: SlackAccountConfig["reactionAllowlist"];
+  replyToMode?: SlackAccountConfig["replyToMode"];
+  replyToModeByChatType?: SlackAccountConfig["replyToModeByChatType"];
+  actions?: SlackAccountConfig["actions"];
+  slashCommand?: SlackAccountConfig["slashCommand"];
+  dm?: SlackAccountConfig["dm"];
+  channels?: SlackAccountConfig["channels"];
+};
+
+function resolveSlackAccountConfig(
+  cfg: OpenClawConfig,
+  accountId: string,
+): SlackAccountConfig | undefined {
+  return resolveAccountEntry(cfg.channels?.slack?.accounts, accountId);
+}
+
+function mergeSlackAccountConfig(cfg: OpenClawConfig, accountId: string): SlackAccountConfig {
+  const { accounts: _ignored, ...base } = (cfg.channels?.slack ?? {}) as SlackAccountConfig & {
+    accounts?: unknown;
+  };
+  const account = resolveSlackAccountConfig(cfg, accountId) ?? {};
+  return { ...base, ...account };
+}
 
 function inspectSlackToken(value: unknown): {
   token?: string;

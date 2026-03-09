@@ -30,39 +30,6 @@ function resolvePartIndex(partIndex: number | undefined): number {
   return typeof partIndex === "number" ? partIndex : 0;
 }
 
-async function sendBlueBubblesChatEndpointRequest(params: {
-  chatGuid: string;
-  opts: BlueBubblesChatOpts;
-  endpoint: "read" | "typing";
-  method: "POST" | "DELETE";
-  action: "read" | "typing";
-}): Promise<void> {
-  const trimmed = params.chatGuid.trim();
-  if (!trimmed) {
-    return;
-  }
-  const { baseUrl, password, accountId } = resolveAccount(params.opts);
-  if (getCachedBlueBubblesPrivateApiStatus(accountId) === false) {
-    return;
-  }
-  const url = buildBlueBubblesApiUrl({
-    baseUrl,
-    path: `/api/v1/chat/${encodeURIComponent(trimmed)}/${params.endpoint}`,
-    password,
-  });
-  const res = await blueBubblesFetchWithTimeout(
-    url,
-    { method: params.method },
-    params.opts.timeoutMs,
-  );
-  if (!res.ok) {
-    const errorText = await res.text().catch(() => "");
-    throw new Error(
-      `BlueBubbles ${params.action} failed (${res.status}): ${errorText || "unknown"}`,
-    );
-  }
-}
-
 async function sendPrivateApiJsonRequest(params: {
   opts: BlueBubblesChatOpts;
   feature: string;
@@ -98,13 +65,24 @@ export async function markBlueBubblesChatRead(
   chatGuid: string,
   opts: BlueBubblesChatOpts = {},
 ): Promise<void> {
-  await sendBlueBubblesChatEndpointRequest({
-    chatGuid,
-    opts,
-    endpoint: "read",
-    method: "POST",
-    action: "read",
+  const trimmed = chatGuid.trim();
+  if (!trimmed) {
+    return;
+  }
+  const { baseUrl, password, accountId } = resolveAccount(opts);
+  if (getCachedBlueBubblesPrivateApiStatus(accountId) === false) {
+    return;
+  }
+  const url = buildBlueBubblesApiUrl({
+    baseUrl,
+    path: `/api/v1/chat/${encodeURIComponent(trimmed)}/read`,
+    password,
   });
+  const res = await blueBubblesFetchWithTimeout(url, { method: "POST" }, opts.timeoutMs);
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => "");
+    throw new Error(`BlueBubbles read failed (${res.status}): ${errorText || "unknown"}`);
+  }
 }
 
 export async function sendBlueBubblesTyping(
@@ -112,13 +90,28 @@ export async function sendBlueBubblesTyping(
   typing: boolean,
   opts: BlueBubblesChatOpts = {},
 ): Promise<void> {
-  await sendBlueBubblesChatEndpointRequest({
-    chatGuid,
-    opts,
-    endpoint: "typing",
-    method: typing ? "POST" : "DELETE",
-    action: "typing",
+  const trimmed = chatGuid.trim();
+  if (!trimmed) {
+    return;
+  }
+  const { baseUrl, password, accountId } = resolveAccount(opts);
+  if (getCachedBlueBubblesPrivateApiStatus(accountId) === false) {
+    return;
+  }
+  const url = buildBlueBubblesApiUrl({
+    baseUrl,
+    path: `/api/v1/chat/${encodeURIComponent(trimmed)}/typing`,
+    password,
   });
+  const res = await blueBubblesFetchWithTimeout(
+    url,
+    { method: typing ? "POST" : "DELETE" },
+    opts.timeoutMs,
+  );
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => "");
+    throw new Error(`BlueBubbles typing failed (${res.status}): ${errorText || "unknown"}`);
+  }
 }
 
 /**

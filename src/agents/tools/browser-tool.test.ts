@@ -127,7 +127,7 @@ function registerBrowserToolAfterEachReset() {
 }
 
 async function runSnapshotToolCall(params: {
-  snapshotFormat?: "ai" | "aria";
+  snapshotFormat: "ai" | "aria";
   refs?: "aria" | "dom";
   maxChars?: number;
   profile?: string;
@@ -243,23 +243,6 @@ describe("browser tool snapshot maxChars", () => {
     );
   });
 
-  it("lets the server choose snapshot format when the user does not request one", async () => {
-    const tool = createBrowserTool();
-    await tool.execute?.("call-1", { action: "snapshot", profile: "chrome" });
-
-    expect(browserClientMocks.browserSnapshot).toHaveBeenCalledWith(
-      undefined,
-      expect.objectContaining({
-        profile: "chrome",
-      }),
-    );
-    const opts = browserClientMocks.browserSnapshot.mock.calls.at(-1)?.[1] as
-      | { format?: string; maxChars?: number }
-      | undefined;
-    expect(opts?.format).toBeUndefined();
-    expect(Object.hasOwn(opts ?? {}, "maxChars")).toBe(false);
-  });
-
   it("routes to node proxy when target=node", async () => {
     mockSingleBrowserProxyNode();
     const tool = createBrowserTool();
@@ -267,42 +250,13 @@ describe("browser tool snapshot maxChars", () => {
 
     expect(gatewayMocks.callGatewayTool).toHaveBeenCalledWith(
       "node.invoke",
-      { timeoutMs: 25000 },
+      { timeoutMs: 20000 },
       expect.objectContaining({
         nodeId: "node-1",
         command: "browser.proxy",
-        params: expect.objectContaining({
-          timeoutMs: 20000,
-        }),
       }),
     );
     expect(browserClientMocks.browserStatus).not.toHaveBeenCalled();
-  });
-
-  it("gives node.invoke extra slack beyond the default proxy timeout", async () => {
-    mockSingleBrowserProxyNode();
-    gatewayMocks.callGatewayTool.mockResolvedValueOnce({
-      ok: true,
-      payload: {
-        result: { ok: true, running: true },
-      },
-    });
-    const tool = createBrowserTool();
-    await tool.execute?.("call-1", {
-      action: "dialog",
-      target: "node",
-      accept: true,
-    });
-
-    expect(gatewayMocks.callGatewayTool).toHaveBeenCalledWith(
-      "node.invoke",
-      { timeoutMs: 25000 },
-      expect.objectContaining({
-        params: expect.objectContaining({
-          timeoutMs: 20000,
-        }),
-      }),
-    );
   });
 
   it("keeps sandbox bridge url when node proxy is available", async () => {
@@ -617,18 +571,17 @@ describe("browser tool external content wrapping", () => {
 describe("browser tool act stale target recovery", () => {
   registerBrowserToolAfterEachReset();
 
-  it("retries safe chrome act once without targetId when exactly one tab remains", async () => {
+  it("retries chrome act once without targetId when tab id is stale", async () => {
     browserActionsMocks.browserAct
       .mockRejectedValueOnce(new Error("404: tab not found"))
       .mockResolvedValueOnce({ ok: true });
-    browserClientMocks.browserTabs.mockResolvedValueOnce([{ targetId: "only-tab" }]);
 
     const tool = createBrowserTool();
     const result = await tool.execute?.("call-1", {
       action: "act",
       profile: "chrome",
       request: {
-        kind: "hover",
+        action: "click",
         targetId: "stale-tab",
         ref: "btn-1",
       },
@@ -638,7 +591,7 @@ describe("browser tool act stale target recovery", () => {
     expect(browserActionsMocks.browserAct).toHaveBeenNthCalledWith(
       1,
       undefined,
-      expect.objectContaining({ targetId: "stale-tab", kind: "hover", ref: "btn-1" }),
+      expect.objectContaining({ targetId: "stale-tab", action: "click", ref: "btn-1" }),
       expect.objectContaining({ profile: "chrome" }),
     );
     expect(browserActionsMocks.browserAct).toHaveBeenNthCalledWith(
@@ -648,25 +601,5 @@ describe("browser tool act stale target recovery", () => {
       expect.objectContaining({ profile: "chrome" }),
     );
     expect(result?.details).toMatchObject({ ok: true });
-  });
-
-  it("does not retry mutating chrome act requests without targetId", async () => {
-    browserActionsMocks.browserAct.mockRejectedValueOnce(new Error("404: tab not found"));
-    browserClientMocks.browserTabs.mockResolvedValueOnce([{ targetId: "only-tab" }]);
-
-    const tool = createBrowserTool();
-    await expect(
-      tool.execute?.("call-1", {
-        action: "act",
-        profile: "chrome",
-        request: {
-          kind: "click",
-          targetId: "stale-tab",
-          ref: "btn-1",
-        },
-      }),
-    ).rejects.toThrow(/Run action=tabs profile="chrome"/i);
-
-    expect(browserActionsMocks.browserAct).toHaveBeenCalledTimes(1);
   });
 });

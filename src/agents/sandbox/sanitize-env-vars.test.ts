@@ -5,9 +5,9 @@ describe("sanitizeEnvVars", () => {
   it("keeps normal env vars and blocks obvious credentials", () => {
     const result = sanitizeEnvVars({
       NODE_ENV: "test",
-      OPENAI_API_KEY: "sk-live-xxx", // pragma: allowlist secret
+      OPENAI_API_KEY: "sk-live-xxx",
       FOO: "bar",
-      GITHUB_TOKEN: "gh-token", // pragma: allowlist secret
+      GITHUB_TOKEN: "gh-token",
     });
 
     expect(result.allowed).toEqual({

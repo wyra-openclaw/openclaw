@@ -19,7 +19,7 @@ import { resolveUserPath } from "../utils.js";
 export type WebMediaResult = {
   buffer: Buffer;
   contentType?: string;
-  kind: MediaKind | undefined;
+  kind: MediaKind;
   fileName?: string;
 };
 
@@ -284,12 +284,12 @@ async function loadWebMediaInternal(
   const clampAndFinalize = async (params: {
     buffer: Buffer;
     contentType?: string;
-    kind: MediaKind | undefined;
+    kind: MediaKind;
     fileName?: string;
   }): Promise<WebMediaResult> => {
     // If caller explicitly provides maxBytes, trust it (for channels that handle large files).
     // Otherwise fall back to per-kind defaults.
-    const cap = maxBytes !== undefined ? maxBytes : maxBytesForKind(params.kind ?? "document");
+    const cap = maxBytes !== undefined ? maxBytes : maxBytesForKind(params.kind);
     if (params.kind === "image") {
       const isGif = params.contentType === "image/gif";
       if (isGif || !optimizeImages) {
@@ -324,7 +324,7 @@ async function loadWebMediaInternal(
   if (/^https?:\/\//i.test(mediaUrl)) {
     // Enforce a download cap during fetch to avoid unbounded memory usage.
     // For optimized images, allow fetching larger payloads before compression.
-    const defaultFetchCap = maxBytesForKind("document");
+    const defaultFetchCap = maxBytesForKind("unknown");
     const fetchCap =
       maxBytes === undefined
         ? defaultFetchCap

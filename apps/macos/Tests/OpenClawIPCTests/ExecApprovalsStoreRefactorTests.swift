@@ -17,8 +17,8 @@ struct ExecApprovalsStoreRefactorTests {
     }
 
     @Test
-    func `ensure file skips rewrite when unchanged`() async throws {
-        try await self.withTempStateDir { _ in
+    func ensureFileSkipsRewriteWhenUnchanged() async throws {
+        try await self.withTempStateDir { stateDir in
             _ = ExecApprovalsStore.ensureFile()
             let url = ExecApprovalsStore.fileURL()
             let firstWriteDate = try Self.modificationDate(at: url)
@@ -32,7 +32,7 @@ struct ExecApprovalsStoreRefactorTests {
     }
 
     @Test
-    func `update allowlist reports rejected basename pattern`() async throws {
+    func updateAllowlistReportsRejectedBasenamePattern() async throws {
         try await self.withTempStateDir { _ in
             let rejected = ExecApprovalsStore.updateAllowlist(
                 agentId: "main",
@@ -50,7 +50,7 @@ struct ExecApprovalsStoreRefactorTests {
     }
 
     @Test
-    func `update allowlist migrates legacy pattern from resolved path`() async throws {
+    func updateAllowlistMigratesLegacyPatternFromResolvedPath() async throws {
         try await self.withTempStateDir { _ in
             let rejected = ExecApprovalsStore.updateAllowlist(
                 agentId: "main",
@@ -69,7 +69,7 @@ struct ExecApprovalsStoreRefactorTests {
     }
 
     @Test
-    func `ensure file hardens state directory permissions`() async throws {
+    func ensureFileHardensStateDirectoryPermissions() async throws {
         try await self.withTempStateDir { stateDir in
             try FileManager().createDirectory(at: stateDir, withIntermediateDirectories: true)
             try FileManager().setAttributes([.posixPermissions: 0o755], ofItemAtPath: stateDir.path)

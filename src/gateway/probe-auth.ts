@@ -1,7 +1,5 @@
 import type { OpenClawConfig } from "../config/config.js";
-import { resolveGatewayCredentialsWithSecretInputs } from "./call.js";
 import {
-  type ExplicitGatewayAuth,
   isGatewaySecretRefUnavailableError,
   resolveGatewayCredentialsFromConfig,
 } from "./credentials.js";
@@ -14,22 +12,6 @@ export function resolveGatewayProbeAuth(params: {
   return resolveGatewayCredentialsFromConfig({
     cfg: params.cfg,
     env: params.env,
-    modeOverride: params.mode,
-    includeLegacyEnv: false,
-    remoteTokenFallback: "remote-only",
-  });
-}
-
-export async function resolveGatewayProbeAuthWithSecretInputs(params: {
-  cfg: OpenClawConfig;
-  mode: "local" | "remote";
-  env?: NodeJS.ProcessEnv;
-  explicitAuth?: ExplicitGatewayAuth;
-}): Promise<{ token?: string; password?: string }> {
-  return await resolveGatewayCredentialsWithSecretInputs({
-    config: params.cfg,
-    env: params.env,
-    explicitAuth: params.explicitAuth,
     modeOverride: params.mode,
     includeLegacyEnv: false,
     remoteTokenFallback: "remote-only",

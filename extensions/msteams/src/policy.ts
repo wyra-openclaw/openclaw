@@ -10,7 +10,6 @@ import type {
 } from "openclaw/plugin-sdk/msteams";
 import {
   buildChannelKeyCandidates,
-  evaluateSenderGroupAccessForPolicy,
   normalizeChannelSlug,
   resolveAllowlistMatchSimple,
   resolveToolsBySender,
@@ -249,10 +248,12 @@ export function isMSTeamsGroupAllowed(params: {
   senderName?: string | null;
   allowNameMatching?: boolean;
 }): boolean {
-  return evaluateSenderGroupAccessForPolicy({
-    groupPolicy: params.groupPolicy,
-    groupAllowFrom: params.allowFrom.map((entry) => String(entry)),
-    senderId: params.senderId,
-    isSenderAllowed: () => resolveMSTeamsAllowlistMatch(params).allowed,
-  }).allowed;
+  const { groupPolicy } = params;
+  if (groupPolicy === "disabled") {
+    return false;
+  }
+  if (groupPolicy === "open") {
+    return true;
+  }
+  return resolveMSTeamsAllowlistMatch(params).allowed;
 }

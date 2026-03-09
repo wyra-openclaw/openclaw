@@ -7,7 +7,7 @@ import {
 
 export const MAX_DISPATCH_WRAPPER_DEPTH = 4;
 
-const WINDOWS_EXECUTABLE_SUFFIXES = [".exe", ".cmd", ".bat", ".com"] as const;
+const WINDOWS_EXE_SUFFIX = ".exe";
 
 const POSIX_SHELL_WRAPPER_NAMES = ["ash", "bash", "dash", "fish", "ksh", "sh", "zsh"] as const;
 const WINDOWS_CMD_WRAPPER_NAMES = ["cmd"] as const;
@@ -31,18 +31,13 @@ function withWindowsExeAliases(names: readonly string[]): string[] {
   const expanded = new Set<string>();
   for (const name of names) {
     expanded.add(name);
-    expanded.add(`${name}.exe`);
+    expanded.add(`${name}${WINDOWS_EXE_SUFFIX}`);
   }
   return Array.from(expanded);
 }
 
-function stripWindowsExecutableSuffix(value: string): string {
-  for (const suffix of WINDOWS_EXECUTABLE_SUFFIXES) {
-    if (value.endsWith(suffix)) {
-      return value.slice(0, -suffix.length);
-    }
-  }
-  return value;
+function stripWindowsExeSuffix(value: string): string {
+  return value.endsWith(WINDOWS_EXE_SUFFIX) ? value.slice(0, -WINDOWS_EXE_SUFFIX.length) : value;
 }
 
 export const POSIX_SHELL_WRAPPERS = new Set(POSIX_SHELL_WRAPPER_NAMES);
@@ -108,10 +103,6 @@ export type ShellWrapperCommand = {
   command: string | null;
 };
 
-function isWithinDispatchClassificationDepth(depth: number): boolean {
-  return depth <= MAX_DISPATCH_WRAPPER_DEPTH;
-}
-
 export function basenameLower(token: string): string {
   const win = path.win32.basename(token);
   const posix = path.posix.basename(token);
@@ -120,7 +111,7 @@ export function basenameLower(token: string): string {
 }
 
 export function normalizeExecutableToken(token: string): string {
-  return stripWindowsExecutableSuffix(basenameLower(token));
+  return stripWindowsExeSuffix(basenameLower(token));
 }
 
 export function isDispatchWrapperExecutable(token: string): boolean {
@@ -137,7 +128,7 @@ function normalizeRawCommand(rawCommand?: string | null): string | null {
 }
 
 function findShellWrapperSpec(baseExecutable: string): ShellWrapperSpec | null {
-  const canonicalBase = stripWindowsExecutableSuffix(baseExecutable);
+  const canonicalBase = stripWindowsExeSuffix(baseExecutable);
   for (const spec of SHELL_WRAPPER_SPECS) {
     if (spec.names.has(canonicalBase)) {
       return spec;
@@ -518,7 +509,7 @@ function hasEnvManipulationBeforeShellWrapperInternal(
   depth: number,
   envManipulationSeen: boolean,
 ): boolean {
-  if (!isWithinDispatchClassificationDepth(depth)) {
+  if (depth >= MAX_DISPATCH_WRAPPER_DEPTH) {
     return false;
   }
 
@@ -616,7 +607,7 @@ function extractShellWrapperCommandInternal(
   rawCommand: string | null,
   depth: number,
 ): ShellWrapperCommand {
-  if (!isWithinDispatchClassificationDepth(depth)) {
+  if (depth >= MAX_DISPATCH_WRAPPER_DEPTH) {
     return { isWrapper: false, command: null };
   }
 

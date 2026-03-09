@@ -1,5 +1,3 @@
-import { mapAllowFromEntries } from "../plugin-sdk/channel-config-helpers.js";
-
 export function normalizeNonEmptyString(value: unknown): string | null {
   if (typeof value !== "string") {
     return null;
@@ -9,5 +7,5 @@ export function normalizeNonEmptyString(value: unknown): string | null {
 }
 
 export function normalizeStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? mapAllowFromEntries(value) : [];
+  return Array.isArray(value) ? value.map((entry) => String(entry)) : [];
 }

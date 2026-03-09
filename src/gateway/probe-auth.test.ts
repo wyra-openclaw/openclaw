@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
-import {
-  resolveGatewayProbeAuthSafe,
-  resolveGatewayProbeAuthWithSecretInputs,
-} from "./probe-auth.js";
+import { resolveGatewayProbeAuthSafe } from "./probe-auth.js";
 
 describe("resolveGatewayProbeAuthSafe", () => {
   it("returns probe auth credentials when available", () => {
@@ -79,35 +76,6 @@ describe("resolveGatewayProbeAuthSafe", () => {
         token: undefined,
         password: undefined,
       },
-    });
-  });
-});
-
-describe("resolveGatewayProbeAuthWithSecretInputs", () => {
-  it("resolves local probe SecretRef values before shared credential selection", async () => {
-    const auth = await resolveGatewayProbeAuthWithSecretInputs({
-      cfg: {
-        gateway: {
-          auth: {
-            mode: "token",
-            token: { source: "env", provider: "default", id: "DAEMON_GATEWAY_TOKEN" },
-          },
-        },
-        secrets: {
-          providers: {
-            default: { source: "env" },
-          },
-        },
-      } as OpenClawConfig,
-      mode: "local",
-      env: {
-        DAEMON_GATEWAY_TOKEN: "resolved-daemon-token",
-      } as NodeJS.ProcessEnv,
-    });
-
-    expect(auth).toEqual({
-      token: "resolved-daemon-token",
-      password: undefined,
     });
   });
 });

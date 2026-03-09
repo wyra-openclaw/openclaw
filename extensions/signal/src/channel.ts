@@ -1,9 +1,4 @@
 import {
-  buildAccountScopedDmSecurityPolicy,
-  createScopedAccountConfigAccessors,
-  collectAllowlistProviderRestrictSendersWarnings,
-} from "openclaw/plugin-sdk/compat";
-import {
   applyAccountNameToChannelSection,
   buildBaseAccountStatusSnapshot,
   buildBaseChannelStatusSummary,
@@ -12,6 +7,7 @@ import {
   createDefaultChannelRuntimeState,
   DEFAULT_ACCOUNT_ID,
   deleteAccountFromConfigSection,
+  formatPairingApproveHint,
   getChatChannelMeta,
   listSignalAccountIds,
   looksLikeSignalTargetId,
@@ -22,6 +18,8 @@ import {
   PAIRING_APPROVED_MESSAGE,
   resolveChannelMediaMaxBytes,
   resolveDefaultSignalAccountId,
+  resolveAllowlistProviderRuntimeGroupPolicy,
+  resolveDefaultGroupPolicy,
   resolveSignalAccount,
   setAccountEnabledInConfigSection,
   signalOnboardingAdapter,
@@ -46,18 +44,6 @@ const signalMessageActions: ChannelMessageActionAdapter = {
 };
 
 const meta = getChatChannelMeta("signal");
-
-const signalConfigAccessors = createScopedAccountConfigAccessors({
-  resolveAccount: ({ cfg, accountId }) => resolveSignalAccount({ cfg, accountId }),
-  resolveAllowFrom: (account: ResolvedSignalAccount) => account.config.allowFrom,
-  formatAllowFrom: (allowFrom) =>
-    allowFrom
-      .map((entry) => String(entry).trim())
-      .filter(Boolean)
-      .map((entry) => (entry === "*" ? "*" : normalizeE164(entry.replace(/^signal:/i, ""))))
-      .filter(Boolean),
-  resolveDefaultTo: (account: ResolvedSignalAccount) => account.config.defaultTo,
-});
 
 function buildSignalSetupPatch(input: {
   signalNumber?: string;
@@ -153,32 +139,48 @@ export const signalPlugin: ChannelPlugin<ResolvedSignalAccount> = {
       configured: account.configured,
       baseUrl: account.baseUrl,
     }),
-    ...signalConfigAccessors,
+    resolveAllowFrom: ({ cfg, accountId }) =>
+      (resolveSignalAccount({ cfg, accountId }).config.allowFrom ?? []).map((entry) =>
+        String(entry),
+      ),
+    formatAllowFrom: ({ allowFrom }) =>
+      allowFrom
+        .map((entry) => String(entry).trim())
+        .filter(Boolean)
+        .map((entry) => (entry === "*" ? "*" : normalizeE164(entry.replace(/^signal:/i, ""))))
+        .filter(Boolean),
+    resolveDefaultTo: ({ cfg, accountId }) =>
+      resolveSignalAccount({ cfg, accountId }).config.defaultTo?.trim() || undefined,
   },
   security: {
     resolveDmPolicy: ({ cfg, accountId, account }) => {
-      return buildAccountScopedDmSecurityPolicy({
-        cfg,
-        channelKey: "signal",
-        accountId,
-        fallbackAccountId: account.accountId ?? DEFAULT_ACCOUNT_ID,
-        policy: account.config.dmPolicy,
+      const resolvedAccountId = accountId ?? account.accountId ?? DEFAULT_ACCOUNT_ID;
+      const useAccountPath = Boolean(cfg.channels?.signal?.accounts?.[resolvedAccountId]);
+      const basePath = useAccountPath
+        ? `channels.signal.accounts.${resolvedAccountId}.`
+        : "channels.signal.";
+      return {
+        policy: account.config.dmPolicy ?? "pairing",
         allowFrom: account.config.allowFrom ?? [],
-        policyPathSuffix: "dmPolicy",
+        policyPath: `${basePath}dmPolicy`,
+        allowFromPath: basePath,
+        approveHint: formatPairingApproveHint("signal"),
         normalizeEntry: (raw) => normalizeE164(raw.replace(/^signal:/i, "").trim()),
-      });
+      };
     },
     collectWarnings: ({ account, cfg }) => {
-      return collectAllowlistProviderRestrictSendersWarnings({
-        cfg,
+      const defaultGroupPolicy = resolveDefaultGroupPolicy(cfg);
+      const { groupPolicy } = resolveAllowlistProviderRuntimeGroupPolicy({
         providerConfigPresent: cfg.channels?.signal !== undefined,
-        configuredGroupPolicy: account.config.groupPolicy,
-        surface: "Signal groups",
-        openScope: "any member",
-        groupPolicyPath: "channels.signal.groupPolicy",
-        groupAllowFromPath: "channels.signal.groupAllowFrom",
-        mentionGated: false,
+        groupPolicy: account.config.groupPolicy,
+        defaultGroupPolicy,
       });
+      if (groupPolicy !== "open") {
+        return [];
+      }
+      return [
+        `- Signal groups: groupPolicy="open" allows any member to trigger the bot. Set channels.signal.groupPolicy="allowlist" + channels.signal.groupAllowFrom to restrict senders.`,
+      ];
     },
   },
   messaging: {

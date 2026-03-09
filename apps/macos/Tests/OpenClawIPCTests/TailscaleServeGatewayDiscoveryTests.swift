@@ -2,8 +2,9 @@ import Foundation
 import Testing
 @testable import OpenClawDiscovery
 
+@Suite
 struct TailscaleServeGatewayDiscoveryTests {
-    @Test func `discovers serve gateway from tailnet peers`() async {
+    @Test func discoversServeGatewayFromTailnetPeers() async {
         let statusJson = """
         {
           "Self": {
@@ -45,7 +46,7 @@ struct TailscaleServeGatewayDiscoveryTests {
         #expect(beacons.first?.port == 443)
     }
 
-    @Test func `returns empty when status unavailable`() async {
+    @Test func returnsEmptyWhenStatusUnavailable() async {
         let context = TailscaleServeGatewayDiscovery.DiscoveryContext(
             tailscaleStatus: { nil },
             probeHost: { _, _ in true })
@@ -54,7 +55,7 @@ struct TailscaleServeGatewayDiscoveryTests {
         #expect(beacons.isEmpty)
     }
 
-    @Test func `resolves bare executable from PATH`() throws {
+    @Test func resolvesBareExecutableFromPATH() throws {
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
@@ -69,30 +70,8 @@ struct TailscaleServeGatewayDiscoveryTests {
         #expect(resolved == executable.path)
     }
 
-    @Test func `rejects missing executable candidate`() {
+    @Test func rejectsMissingExecutableCandidate() {
         #expect(TailscaleServeGatewayDiscovery.resolveExecutablePath("", env: [:]) == nil)
-        #expect(TailscaleServeGatewayDiscovery
-            .resolveExecutablePath("definitely-not-here", env: ["PATH": "/tmp"]) == nil)
-    }
-
-    @Test func `adds TERM for GUI-launched tailscale subprocesses`() {
-        let env = TailscaleServeGatewayDiscovery.commandEnvironment(base: [
-            "HOME": "/Users/tester",
-            "PATH": "/usr/bin:/bin",
-        ])
-
-        #expect(env["TERM"] == "dumb")
-        #expect(env["HOME"] == "/Users/tester")
-        #expect(env["PATH"] == "/usr/bin:/bin")
-    }
-
-    @Test func `preserves existing TERM when building tailscale subprocess environment`() {
-        let env = TailscaleServeGatewayDiscovery.commandEnvironment(base: [
-            "TERM": "xterm-256color",
-            "HOME": "/Users/tester",
-        ])
-
-        #expect(env["TERM"] == "xterm-256color")
-        #expect(env["HOME"] == "/Users/tester")
+        #expect(TailscaleServeGatewayDiscovery.resolveExecutablePath("definitely-not-here", env: ["PATH": "/tmp"]) == nil)
     }
 }

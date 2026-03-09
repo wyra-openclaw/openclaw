@@ -1,13 +1,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import {
-  isNonSecretApiKeyMarker,
-  isSecretRefHeaderValueMarker,
-} from "../agents/model-auth-markers.js";
 import { normalizeProviderId } from "../agents/model-selection.js";
 import { resolveStateDir, type OpenClawConfig } from "../config/config.js";
-import { coerceSecretRef } from "../config/types.secrets.js";
 import { resolveSecretInputRef, type SecretRef } from "../config/types.secrets.js";
 import { resolveConfigDir, resolveUserPath } from "../utils.js";
 import { runTasksWithConcurrency } from "../utils/run-with-concurrency.js";
@@ -28,7 +23,6 @@ import {
 import { isNonEmptyString, isRecord } from "./shared.js";
 import { describeUnknownError } from "./shared.js";
 import {
-  listAgentModelsJsonPaths,
   listAuthProfileStorePaths,
   listLegacyAuthJsonPaths,
   parseEnvAssignmentValue,
@@ -42,7 +36,7 @@ export type SecretsAuditCode =
   | "REF_SHADOWED"
   | "LEGACY_RESIDUE";
 
-export type SecretsAuditSeverity = "info" | "warn" | "error"; // pragma: allowlist secret
+export type SecretsAuditSeverity = "info" | "warn" | "error";
 
 export type SecretsAuditFinding = {
   code: SecretsAuditCode;
@@ -54,7 +48,7 @@ export type SecretsAuditFinding = {
   profileId?: string;
 };
 
-export type SecretsAuditStatus = "clean" | "findings" | "unresolved"; // pragma: allowlist secret
+export type SecretsAuditStatus = "clean" | "findings" | "unresolved";
 
 export type SecretsAuditReport = {
   version: 1;
@@ -97,40 +91,6 @@ type AuditCollector = {
 };
 
 const REF_RESOLVE_FALLBACK_CONCURRENCY = 8;
-const ALWAYS_SENSITIVE_MODEL_PROVIDER_HEADER_NAMES = new Set([
-  "authorization",
-  "proxy-authorization",
-  "x-api-key",
-  "api-key",
-  "apikey",
-  "x-auth-token",
-  "auth-token",
-  "x-access-token",
-  "access-token",
-  "x-secret-key",
-  "secret-key",
-]);
-const SENSITIVE_MODEL_PROVIDER_HEADER_NAME_FRAGMENTS = [
-  "api-key",
-  "apikey",
-  "token",
-  "secret",
-  "password",
-  "credential",
-];
-
-function isLikelySensitiveModelProviderHeaderName(value: string): boolean {
-  const normalized = value.trim().toLowerCase();
-  if (!normalized) {
-    return false;
-  }
-  if (ALWAYS_SENSITIVE_MODEL_PROVIDER_HEADER_NAMES.has(normalized)) {
-    return true;
-  }
-  return SENSITIVE_MODEL_PROVIDER_HEADER_NAME_FRAGMENTS.some((fragment) =>
-    normalized.includes(fragment),
-  );
-}
 
 function addFinding(collector: AuditCollector, finding: SecretsAuditFinding): void {
   collector.findings.push(finding);
@@ -232,12 +192,6 @@ function collectConfigSecrets(params: {
       target.value,
       target.entry.expectedResolvedValue,
     );
-    if (
-      target.entry.id === "models.providers.*.headers.*" &&
-      !isLikelySensitiveModelProviderHeaderName(target.pathSegments.at(-1) ?? "")
-    ) {
-      continue;
-    }
     if (!hasPlaintext) {
       continue;
     }
@@ -357,93 +311,6 @@ function collectAuthJsonResidue(params: { stateDir: string; collector: AuditColl
           provider: providerId,
         });
       }
-    }
-  }
-}
-
-function collectModelsJsonSecrets(params: {
-  modelsJsonPath: string;
-  collector: AuditCollector;
-}): void {
-  if (!fs.existsSync(params.modelsJsonPath)) {
-    return;
-  }
-  params.collector.filesScanned.add(params.modelsJsonPath);
-  const parsedResult = readJsonObjectIfExists(params.modelsJsonPath);
-  if (parsedResult.error) {
-    addFinding(params.collector, {
-      code: "REF_UNRESOLVED",
-      severity: "error",
-      file: params.modelsJsonPath,
-      jsonPath: "<root>",
-      message: `Invalid JSON in models.json: ${parsedResult.error}`,
-    });
-    return;
-  }
-  const parsed = parsedResult.value;
-  if (!parsed || !isRecord(parsed.providers)) {
-    return;
-  }
-  for (const [providerId, providerValue] of Object.entries(parsed.providers)) {
-    if (!isRecord(providerValue)) {
-      continue;
-    }
-    const apiKey = providerValue.apiKey;
-    if (coerceSecretRef(apiKey)) {
-      addFinding(params.collector, {
-        code: "REF_UNRESOLVED",
-        severity: "error",
-        file: params.modelsJsonPath,
-        jsonPath: `providers.${providerId}.apiKey`,
-        message: "models.json contains an unresolved SecretRef object; regenerate models.json.",
-        provider: providerId,
-      });
-    } else if (isNonEmptyString(apiKey) && !isNonSecretApiKeyMarker(apiKey)) {
-      addFinding(params.collector, {
-        code: "PLAINTEXT_FOUND",
-        severity: "warn",
-        file: params.modelsJsonPath,
-        jsonPath: `providers.${providerId}.apiKey`,
-        message: "models.json provider apiKey is stored as plaintext.",
-        provider: providerId,
-      });
-    }
-
-    const headers = isRecord(providerValue.headers) ? providerValue.headers : undefined;
-    if (!headers) {
-      continue;
-    }
-    for (const [headerKey, headerValue] of Object.entries(headers)) {
-      const headerPath = `providers.${providerId}.headers.${headerKey}`;
-      if (coerceSecretRef(headerValue)) {
-        addFinding(params.collector, {
-          code: "REF_UNRESOLVED",
-          severity: "error",
-          file: params.modelsJsonPath,
-          jsonPath: headerPath,
-          message:
-            "models.json contains an unresolved SecretRef object for provider headers; regenerate models.json.",
-          provider: providerId,
-        });
-        continue;
-      }
-      if (!isNonEmptyString(headerValue)) {
-        continue;
-      }
-      if (isSecretRefHeaderValueMarker(headerValue)) {
-        continue;
-      }
-      if (!isLikelySensitiveModelProviderHeaderName(headerKey)) {
-        continue;
-      }
-      addFinding(params.collector, {
-        code: "PLAINTEXT_FOUND",
-        severity: "warn",
-        file: params.modelsJsonPath,
-        jsonPath: headerPath,
-        message: "models.json provider header value is stored as plaintext.",
-        provider: providerId,
-      });
     }
   }
 }
@@ -628,12 +495,6 @@ export async function runSecretsAudit(
         authStorePath,
         collector,
         defaults,
-      });
-    }
-    for (const modelsJsonPath of listAgentModelsJsonPaths(config, stateDir)) {
-      collectModelsJsonSecrets({
-        modelsJsonPath,
-        collector,
       });
     }
     await collectUnresolvedRefFindings({

@@ -2,7 +2,7 @@ import Testing
 @testable import OpenClaw
 
 struct HostEnvSanitizerTests {
-    @Test func `sanitize blocks shell trace variables`() {
+    @Test func sanitizeBlocksShellTraceVariables() {
         let env = HostEnvSanitizer.sanitize(overrides: [
             "SHELLOPTS": "xtrace",
             "PS4": "$(touch /tmp/pwned)",
@@ -13,7 +13,7 @@ struct HostEnvSanitizerTests {
         #expect(env["OPENCLAW_TEST"] == "1")
     }
 
-    @Test func `sanitize shell wrapper allows only explicit override keys`() {
+    @Test func sanitizeShellWrapperAllowsOnlyExplicitOverrideKeys() {
         let env = HostEnvSanitizer.sanitize(
             overrides: [
                 "LANG": "C",
@@ -29,7 +29,7 @@ struct HostEnvSanitizerTests {
         #expect(env["PS4"] == nil)
     }
 
-    @Test func `sanitize non shell wrapper keeps regular overrides`() {
+    @Test func sanitizeNonShellWrapperKeepsRegularOverrides() {
         let env = HostEnvSanitizer.sanitize(overrides: ["OPENCLAW_TOKEN": "secret"])
         #expect(env["OPENCLAW_TOKEN"] == "secret")
     }

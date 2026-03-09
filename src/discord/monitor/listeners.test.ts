@@ -25,63 +25,44 @@ describe("DiscordMessageListener", () => {
     const listener = new DiscordMessageListener(handler as never, logger as never);
 
     await expect(listener.handle(fakeEvent("ch-1"), {} as never)).resolves.toBeUndefined();
-    // Handler was dispatched but may not have been called yet (fire-and-forget).
-    // Wait for the microtask to flush so the handler starts.
-    await vi.waitFor(() => {
-      expect(handler).toHaveBeenCalledTimes(1);
-    });
+    expect(handler).toHaveBeenCalledTimes(1);
     expect(logger.error).not.toHaveBeenCalled();
 
     resolveHandler?.();
     await handlerDone;
   });
 
-  it("runs handlers for the same channel concurrently (no per-channel serialization)", async () => {
-    const order: string[] = [];
-    let resolveA: (() => void) | undefined;
-    let resolveB: (() => void) | undefined;
-    const doneA = new Promise<void>((r) => {
-      resolveA = r;
+  it("serializes queued handler runs for the same channel", async () => {
+    let firstResolve: (() => void) | undefined;
+    let secondResolve: (() => void) | undefined;
+    const firstDone = new Promise<void>((resolve) => {
+      firstResolve = resolve;
     });
-    const doneB = new Promise<void>((r) => {
-      resolveB = r;
+    const secondDone = new Promise<void>((resolve) => {
+      secondResolve = resolve;
     });
-    let callCount = 0;
+    let runCount = 0;
     const handler = vi.fn(async () => {
-      callCount += 1;
-      const id = callCount;
-      order.push(`start:${id}`);
-      if (id === 1) {
-        await doneA;
-      } else {
-        await doneB;
+      runCount += 1;
+      if (runCount === 1) {
+        await firstDone;
+        return;
       }
-      order.push(`end:${id}`);
+      await secondDone;
     });
     const listener = new DiscordMessageListener(handler as never, createLogger() as never);
 
-    // Both messages target the same channel — previously serialized, now concurrent.
-    await listener.handle(fakeEvent("ch-1"), {} as never);
-    await listener.handle(fakeEvent("ch-1"), {} as never);
+    await expect(listener.handle(fakeEvent("ch-1"), {} as never)).resolves.toBeUndefined();
+    await expect(listener.handle(fakeEvent("ch-1"), {} as never)).resolves.toBeUndefined();
 
+    expect(handler).toHaveBeenCalledTimes(1);
+    firstResolve?.();
     await vi.waitFor(() => {
       expect(handler).toHaveBeenCalledTimes(2);
     });
-    // Both handlers started without waiting for the first to finish.
-    expect(order).toContain("start:1");
-    expect(order).toContain("start:2");
 
-    resolveB?.();
-    await vi.waitFor(() => {
-      expect(order).toContain("end:2");
-    });
-    // First handler is still running — no serialization.
-    expect(order).not.toContain("end:1");
-
-    resolveA?.();
-    await vi.waitFor(() => {
-      expect(order).toContain("end:1");
-    });
+    secondResolve?.();
+    await secondDone;
   });
 
   it("runs handlers for different channels in parallel", async () => {
@@ -141,14 +122,109 @@ describe("DiscordMessageListener", () => {
     });
   });
 
-  it("calls onEvent callback for each message", async () => {
-    const handler = vi.fn(async () => {});
-    const onEvent = vi.fn();
-    const listener = new DiscordMessageListener(handler as never, undefined, onEvent);
+  it("continues same-channel processing after handler timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      const never = new Promise<void>(() => {});
+      const handler = vi.fn(async () => {
+        if (handler.mock.calls.length === 1) {
+          await never;
+          return;
+        }
+      });
+      const logger = createLogger();
+      const listener = new DiscordMessageListener(handler as never, logger as never, undefined, {
+        timeoutMs: 50,
+      });
 
-    await listener.handle(fakeEvent("ch-1"), {} as never);
-    await listener.handle(fakeEvent("ch-2"), {} as never);
+      await listener.handle(fakeEvent("ch-1"), {} as never);
+      await listener.handle(fakeEvent("ch-1"), {} as never);
+      expect(handler).toHaveBeenCalledTimes(1);
 
-    expect(onEvent).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(60);
+      await vi.waitFor(() => {
+        expect(handler).toHaveBeenCalledTimes(2);
+      });
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining("timed out after"));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("aborts timed-out handlers and prevents late side effects", async () => {
+    vi.useFakeTimers();
+    try {
+      let abortReceived = false;
+      let lateSideEffect = false;
+      const handler = vi.fn(
+        async (
+          _data: unknown,
+          _client: unknown,
+          options?: {
+            abortSignal?: AbortSignal;
+          },
+        ) => {
+          await new Promise<void>((resolve) => {
+            if (options?.abortSignal?.aborted) {
+              abortReceived = true;
+              resolve();
+              return;
+            }
+            options?.abortSignal?.addEventListener(
+              "abort",
+              () => {
+                abortReceived = true;
+                resolve();
+              },
+              { once: true },
+            );
+          });
+          if (options?.abortSignal?.aborted) {
+            return;
+          }
+          lateSideEffect = true;
+        },
+      );
+      const logger = createLogger();
+      const listener = new DiscordMessageListener(handler as never, logger as never, undefined, {
+        timeoutMs: 50,
+      });
+
+      await listener.handle(fakeEvent("ch-1"), {} as never);
+      await listener.handle(fakeEvent("ch-1"), {} as never);
+
+      await vi.advanceTimersByTimeAsync(60);
+      await vi.waitFor(() => {
+        expect(handler).toHaveBeenCalledTimes(2);
+      });
+      expect(abortReceived).toBe(true);
+      expect(lateSideEffect).toBe(false);
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining("timed out after"));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not emit slow-listener warnings when timeout already fired", async () => {
+    vi.useFakeTimers();
+    try {
+      const never = new Promise<void>(() => {});
+      const handler = vi.fn(async () => {
+        await never;
+      });
+      const logger = createLogger();
+      const listener = new DiscordMessageListener(handler as never, logger as never, undefined, {
+        timeoutMs: 31_000,
+      });
+
+      await listener.handle(fakeEvent("ch-1"), {} as never);
+      await vi.advanceTimersByTimeAsync(31_100);
+      await vi.waitFor(() => {
+        expect(logger.error).toHaveBeenCalledWith(expect.stringContaining("timed out after"));
+      });
+      expect(logger.warn).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

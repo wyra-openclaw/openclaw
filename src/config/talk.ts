@@ -1,12 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type {
-  ResolvedTalkConfig,
-  TalkConfig,
-  TalkConfigResponse,
-  TalkProviderConfig,
-} from "./types.gateway.js";
+import type { TalkConfig, TalkProviderConfig } from "./types.gateway.js";
 import type { OpenClawConfig } from "./types.js";
 import { coerceSecretRef } from "./types.secrets.js";
 
@@ -50,13 +45,6 @@ function normalizeTalkSecretInput(value: unknown): TalkProviderConfig["apiKey"] 
     return trimmed.length > 0 ? trimmed : undefined;
   }
   return coerceSecretRef(value) ?? undefined;
-}
-
-function normalizeSilenceTimeoutMs(value: unknown): number | undefined {
-  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
-    return undefined;
-  }
-  return value;
 }
 
 function normalizeTalkProviderConfig(value: unknown): TalkProviderConfig | undefined {
@@ -137,10 +125,6 @@ function normalizedLegacyTalkFields(source: Record<string, unknown>): Partial<Ta
   if (apiKey !== undefined) {
     legacy.apiKey = apiKey;
   }
-  const silenceTimeoutMs = normalizeSilenceTimeoutMs(source.silenceTimeoutMs);
-  if (silenceTimeoutMs !== undefined) {
-    legacy.silenceTimeoutMs = silenceTimeoutMs;
-  }
   return legacy;
 }
 
@@ -158,14 +142,10 @@ function legacyProviderConfigFromTalk(
 
 function activeProviderFromTalk(talk: TalkConfig): string | undefined {
   const provider = normalizeString(talk.provider);
-  const providers = talk.providers;
   if (provider) {
-    if (providers && !(provider in providers)) {
-      return undefined;
-    }
     return provider;
   }
-  const providerIds = providers ? Object.keys(providers) : [];
+  const providerIds = talk.providers ? Object.keys(talk.providers) : [];
   return providerIds.length === 1 ? providerIds[0] : undefined;
 }
 
@@ -256,24 +236,25 @@ export function normalizeTalkConfig(config: OpenClawConfig): OpenClawConfig {
   };
 }
 
-export function resolveActiveTalkProviderConfig(
-  talk: TalkConfig | undefined,
-): ResolvedTalkConfig | undefined {
+export function resolveActiveTalkProviderConfig(talk: TalkConfig | undefined): {
+  provider?: string;
+  config?: TalkProviderConfig;
+} {
   const normalizedTalk = normalizeTalkSection(talk);
   if (!normalizedTalk) {
-    return undefined;
+    return {};
   }
   const provider = activeProviderFromTalk(normalizedTalk);
   if (!provider) {
-    return undefined;
+    return {};
   }
   return {
     provider,
-    config: normalizedTalk.providers?.[provider] ?? {},
+    config: normalizedTalk.providers?.[provider],
   };
 }
 
-export function buildTalkConfigResponse(value: unknown): TalkConfigResponse | undefined {
+export function buildTalkConfigResponse(value: unknown): TalkConfig | undefined {
   if (!isPlainObject(value)) {
     return undefined;
   }
@@ -282,12 +263,9 @@ export function buildTalkConfigResponse(value: unknown): TalkConfigResponse | un
     return undefined;
   }
 
-  const payload: TalkConfigResponse = {};
+  const payload: TalkConfig = {};
   if (typeof normalized.interruptOnSpeech === "boolean") {
     payload.interruptOnSpeech = normalized.interruptOnSpeech;
-  }
-  if (typeof normalized.silenceTimeoutMs === "number") {
-    payload.silenceTimeoutMs = normalized.silenceTimeoutMs;
   }
   if (normalized.providers && Object.keys(normalized.providers).length > 0) {
     payload.providers = normalized.providers;
@@ -296,12 +274,8 @@ export function buildTalkConfigResponse(value: unknown): TalkConfigResponse | un
     payload.provider = normalized.provider;
   }
 
-  const resolved = resolveActiveTalkProviderConfig(normalized);
-  if (resolved) {
-    payload.resolved = resolved;
-  }
-
-  const providerConfig = resolved?.config;
+  const activeProvider = activeProviderFromTalk(normalized);
+  const providerConfig = activeProvider ? normalized.providers?.[activeProvider] : undefined;
   const providerCompatibilityLegacy = legacyTalkFieldsFromProviderConfig(providerConfig);
   const compatibilityLegacy =
     Object.keys(providerCompatibilityLegacy).length > 0

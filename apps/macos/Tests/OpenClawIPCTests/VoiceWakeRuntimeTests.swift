@@ -3,51 +3,51 @@ import SwabbleKit
 import Testing
 @testable import OpenClaw
 
-struct VoiceWakeRuntimeTests {
-    @Test func `trims after trigger keeps post speech`() {
+@Suite struct VoiceWakeRuntimeTests {
+    @Test func trimsAfterTriggerKeepsPostSpeech() {
         let triggers = ["claude", "openclaw"]
         let text = "hey Claude how are you"
         #expect(VoiceWakeRuntime._testTrimmedAfterTrigger(text, triggers: triggers) == "how are you")
     }
 
-    @Test func `trims after trigger returns original when no trigger`() {
+    @Test func trimsAfterTriggerReturnsOriginalWhenNoTrigger() {
         let triggers = ["claude"]
         let text = "good morning friend"
         #expect(VoiceWakeRuntime._testTrimmedAfterTrigger(text, triggers: triggers) == text)
     }
 
-    @Test func `trims after first matching trigger`() {
+    @Test func trimsAfterFirstMatchingTrigger() {
         let triggers = ["buddy", "claude"]
         let text = "hello buddy this is after trigger claude also here"
         #expect(VoiceWakeRuntime
             ._testTrimmedAfterTrigger(text, triggers: triggers) == "this is after trigger claude also here")
     }
 
-    @Test func `has content after trigger false when only trigger`() {
+    @Test func hasContentAfterTriggerFalseWhenOnlyTrigger() {
         let triggers = ["openclaw"]
         let text = "hey openclaw"
         #expect(!VoiceWakeRuntime._testHasContentAfterTrigger(text, triggers: triggers))
     }
 
-    @Test func `has content after trigger true when speech continues`() {
+    @Test func hasContentAfterTriggerTrueWhenSpeechContinues() {
         let triggers = ["claude"]
         let text = "claude write a note"
         #expect(VoiceWakeRuntime._testHasContentAfterTrigger(text, triggers: triggers))
     }
 
-    @Test func `trims after chinese trigger keeps post speech`() {
+    @Test func trimsAfterChineseTriggerKeepsPostSpeech() {
         let triggers = ["小爪", "openclaw"]
         let text = "嘿 小爪 帮我打开设置"
         #expect(VoiceWakeRuntime._testTrimmedAfterTrigger(text, triggers: triggers) == "帮我打开设置")
     }
 
-    @Test func `trims after trigger handles width insensitive forms`() {
+    @Test func trimsAfterTriggerHandlesWidthInsensitiveForms() {
         let triggers = ["openclaw"]
         let text = "ＯｐｅｎＣｌａｗ 请帮我"
         #expect(VoiceWakeRuntime._testTrimmedAfterTrigger(text, triggers: triggers) == "请帮我")
     }
 
-    @Test func `gate requires gap between trigger and command`() {
+    @Test func gateRequiresGapBetweenTriggerAndCommand() {
         let transcript = "hey openclaw do thing"
         let segments = makeWakeWordSegments(
             transcript: transcript,
@@ -61,7 +61,7 @@ struct VoiceWakeRuntimeTests {
         #expect(WakeWordGate.match(transcript: transcript, segments: segments, config: config) == nil)
     }
 
-    @Test func `gate accepts gap and extracts command`() {
+    @Test func gateAcceptsGapAndExtractsCommand() {
         let transcript = "hey openclaw do thing"
         let segments = makeWakeWordSegments(
             transcript: transcript,

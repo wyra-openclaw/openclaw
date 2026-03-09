@@ -11,7 +11,7 @@ describe("collectCommandSecretAssignmentsFromSnapshot", () => {
     } as unknown as OpenClawConfig;
     const resolvedConfig = {
       talk: {
-        apiKey: "talk-key", // pragma: allowlist secret
+        apiKey: "talk-key",
       },
     } as unknown as OpenClawConfig;
 

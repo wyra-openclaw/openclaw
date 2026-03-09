@@ -153,7 +153,7 @@ describe("secret ref resolver", () => {
       { source: "env", provider: "default", id: "OPENAI_API_KEY" },
       {
         config,
-        env: { OPENAI_API_KEY: "sk-env-value" }, // pragma: allowlist secret
+        env: { OPENAI_API_KEY: "sk-env-value" },
       },
     );
     expect(value).toBe("sk-env-value");
@@ -167,7 +167,7 @@ describe("secret ref resolver", () => {
       JSON.stringify({
         providers: {
           openai: {
-            apiKey: "sk-file-value", // pragma: allowlist secret
+            apiKey: "sk-file-value",
           },
         },
       }),
@@ -195,14 +195,14 @@ describe("secret ref resolver", () => {
 
   itPosix("uses timeoutMs as the default no-output timeout for exec providers", async () => {
     const root = await createCaseDir("exec-delay");
-    const scriptPath = path.join(root, "resolver-delay.sh");
-    // Keep the fixture cheap to start so this stays deterministic under a busy test run.
+    const scriptPath = path.join(root, "resolver-delay.mjs");
     await writeSecureFile(
       scriptPath,
       [
-        "#!/bin/sh",
-        "sleep 0.03",
-        'printf \'{"protocolVersion":1,"values":{"delayed":"ok"}}\'',
+        "#!/usr/bin/env node",
+        "setTimeout(() => {",
+        "  process.stdout.write(JSON.stringify({ protocolVersion: 1, values: { delayed: 'ok' } }));",
+        "}, 30);",
       ].join("\n"),
       0o700,
     );
@@ -375,7 +375,7 @@ describe("secret ref resolver", () => {
       JSON.stringify({
         providers: {
           openai: {
-            apiKey: "sk-file-value", // pragma: allowlist secret
+            apiKey: "sk-file-value",
           },
         },
       }),

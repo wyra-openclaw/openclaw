@@ -30,11 +30,9 @@ final class TalkOverlayController {
         self.ensureWindow()
         self.hostingView?.rootView = TalkOverlayView(controller: self)
         let target = self.targetFrame()
-        let isFirst = !self.model.isVisible
-        if isFirst { self.model.isVisible = true }
         OverlayPanelFactory.present(
             window: self.window,
-            isFirstPresent: isFirst,
+            isVisible: &self.model.isVisible,
             target: target)
         { window in
             window.setFrame(target, display: true)

@@ -3,14 +3,14 @@ import Network
 import Observation
 import SwiftUI
 
-struct HealthSnapshot: Codable {
-    struct ChannelSummary: Codable {
-        struct Probe: Codable {
-            struct Bot: Codable {
+struct HealthSnapshot: Codable, Sendable {
+    struct ChannelSummary: Codable, Sendable {
+        struct Probe: Codable, Sendable {
+            struct Bot: Codable, Sendable {
                 let username: String?
             }
 
-            struct Webhook: Codable {
+            struct Webhook: Codable, Sendable {
                 let url: String?
             }
 
@@ -29,13 +29,13 @@ struct HealthSnapshot: Codable {
         let lastProbeAt: Double?
     }
 
-    struct SessionInfo: Codable {
+    struct SessionInfo: Codable, Sendable {
         let key: String
         let updatedAt: Double?
         let age: Double?
     }
 
-    struct Sessions: Codable {
+    struct Sessions: Codable, Sendable {
         let path: String
         let count: Int
         let recent: [SessionInfo]

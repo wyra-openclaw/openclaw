@@ -5,7 +5,7 @@ describe("BlueBubblesConfigSchema", () => {
   it("accepts account config when serverUrl and password are both set", () => {
     const parsed = BlueBubblesConfigSchema.safeParse({
       serverUrl: "http://localhost:1234",
-      password: "secret", // pragma: allowlist secret
+      password: "secret",
     });
     expect(parsed.success).toBe(true);
   });

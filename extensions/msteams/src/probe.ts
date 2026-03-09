@@ -1,8 +1,4 @@
-import {
-  normalizeStringEntries,
-  type BaseProbeResult,
-  type MSTeamsConfig,
-} from "openclaw/plugin-sdk/msteams";
+import type { BaseProbeResult, MSTeamsConfig } from "openclaw/plugin-sdk/msteams";
 import { formatUnknownError } from "./errors.js";
 import { loadMSTeamsSdkWithAuth } from "./sdk.js";
 import { readAccessToken } from "./token-response.js";
@@ -39,7 +35,7 @@ function readStringArray(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) {
     return undefined;
   }
-  const out = normalizeStringEntries(value);
+  const out = value.map((entry) => String(entry).trim()).filter(Boolean);
   return out.length > 0 ? out : undefined;
 }
 

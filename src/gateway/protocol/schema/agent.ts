@@ -100,7 +100,6 @@ export const AgentParamsSchema = Type.Object(
       Type.Object(
         {
           kind: Type.String({ enum: [...INPUT_PROVENANCE_KIND_VALUES] }),
-          originSessionId: Type.Optional(Type.String()),
           sourceSessionKey: Type.Optional(Type.String()),
           sourceChannel: Type.Optional(Type.String()),
           sourceTool: Type.Optional(Type.String()),
@@ -111,7 +110,6 @@ export const AgentParamsSchema = Type.Object(
     idempotencyKey: NonEmptyString,
     label: Type.Optional(SessionLabelString),
     spawnedBy: Type.Optional(Type.String()),
-    workspaceDir: Type.Optional(Type.String()),
   },
   { additionalProperties: false },
 );

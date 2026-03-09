@@ -7,18 +7,17 @@ import type {
 } from "openclaw/plugin-sdk/bluebubbles";
 import {
   DEFAULT_ACCOUNT_ID,
+  addWildcardAllowFrom,
   formatDocsLink,
   mergeAllowFromEntries,
   normalizeAccountId,
-  resolveAccountIdForConfigure,
-  setTopLevelChannelDmPolicyWithAllowFrom,
+  promptAccountId,
 } from "openclaw/plugin-sdk/bluebubbles";
 import {
   listBlueBubblesAccountIds,
   resolveBlueBubblesAccount,
   resolveDefaultBlueBubblesAccountId,
 } from "./accounts.js";
-import { applyBlueBubblesConnectionConfig } from "./config-apply.js";
 import { hasConfiguredSecretInput, normalizeSecretInputString } from "./secret-input.js";
 import { parseBlueBubblesAllowTarget } from "./targets.js";
 import { normalizeBlueBubblesServerUrl } from "./types.js";
@@ -26,11 +25,19 @@ import { normalizeBlueBubblesServerUrl } from "./types.js";
 const channel = "bluebubbles" as const;
 
 function setBlueBubblesDmPolicy(cfg: OpenClawConfig, dmPolicy: DmPolicy): OpenClawConfig {
-  return setTopLevelChannelDmPolicyWithAllowFrom({
-    cfg,
-    channel: "bluebubbles",
-    dmPolicy,
-  });
+  const allowFrom =
+    dmPolicy === "open" ? addWildcardAllowFrom(cfg.channels?.bluebubbles?.allowFrom) : undefined;
+  return {
+    ...cfg,
+    channels: {
+      ...cfg.channels,
+      bluebubbles: {
+        ...cfg.channels?.bluebubbles,
+        dmPolicy,
+        ...(allowFrom ? { allowFrom } : {}),
+      },
+    },
+  };
 }
 
 function setBlueBubblesAllowFrom(
@@ -152,16 +159,21 @@ export const blueBubblesOnboardingAdapter: ChannelOnboardingAdapter = {
     };
   },
   configure: async ({ cfg, prompter, accountOverrides, shouldPromptAccountIds }) => {
+    const blueBubblesOverride = accountOverrides.bluebubbles?.trim();
     const defaultAccountId = resolveDefaultBlueBubblesAccountId(cfg);
-    const accountId = await resolveAccountIdForConfigure({
-      cfg,
-      prompter,
-      label: "BlueBubbles",
-      accountOverride: accountOverrides.bluebubbles,
-      shouldPromptAccountIds,
-      listAccountIds: listBlueBubblesAccountIds,
-      defaultAccountId,
-    });
+    let accountId = blueBubblesOverride
+      ? normalizeAccountId(blueBubblesOverride)
+      : defaultAccountId;
+    if (shouldPromptAccountIds && !blueBubblesOverride) {
+      accountId = await promptAccountId({
+        cfg,
+        prompter,
+        label: "BlueBubbles",
+        currentId: accountId,
+        listAccountIds: listBlueBubblesAccountIds,
+        defaultAccountId,
+      });
+    }
 
     let next = cfg;
     const resolvedAccount = resolveBlueBubblesAccount({ cfg: next, accountId });
@@ -271,16 +283,42 @@ export const blueBubblesOnboardingAdapter: ChannelOnboardingAdapter = {
     }
 
     // Apply config
-    next = applyBlueBubblesConnectionConfig({
-      cfg: next,
-      accountId,
-      patch: {
-        serverUrl,
-        password,
-        webhookPath,
-      },
-      accountEnabled: "preserve-or-true",
-    });
+    if (accountId === DEFAULT_ACCOUNT_ID) {
+      next = {
+        ...next,
+        channels: {
+          ...next.channels,
+          bluebubbles: {
+            ...next.channels?.bluebubbles,
+            enabled: true,
+            serverUrl,
+            password,
+            webhookPath,
+          },
+        },
+      };
+    } else {
+      next = {
+        ...next,
+        channels: {
+          ...next.channels,
+          bluebubbles: {
+            ...next.channels?.bluebubbles,
+            enabled: true,
+            accounts: {
+              ...next.channels?.bluebubbles?.accounts,
+              [accountId]: {
+                ...next.channels?.bluebubbles?.accounts?.[accountId],
+                enabled: next.channels?.bluebubbles?.accounts?.[accountId]?.enabled ?? true,
+                serverUrl,
+                password,
+                webhookPath,
+              },
+            },
+          },
+        },
+      };
+    }
 
     await prompter.note(
       [

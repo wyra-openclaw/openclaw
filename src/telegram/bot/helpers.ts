@@ -280,52 +280,18 @@ export function buildGroupLabel(msg: Message, chatId: number | string, messageTh
   return `group:${chatId}${topicSuffix}`;
 }
 
-export type TelegramTextEntity = NonNullable<Message["entities"]>[number];
-
-export function getTelegramTextParts(
-  msg: Pick<Message, "text" | "caption" | "entities" | "caption_entities">,
-): {
-  text: string;
-  entities: TelegramTextEntity[];
-} {
-  const text = msg.text ?? msg.caption ?? "";
-  const entities = msg.entities ?? msg.caption_entities ?? [];
-  return { text, entities };
-}
-
-function isTelegramMentionWordChar(char: string | undefined): boolean {
-  return char != null && /[a-z0-9_]/i.test(char);
-}
-
-function hasStandaloneTelegramMention(text: string, mention: string): boolean {
-  let startIndex = 0;
-  while (startIndex < text.length) {
-    const idx = text.indexOf(mention, startIndex);
-    if (idx === -1) {
-      return false;
-    }
-    const prev = idx > 0 ? text[idx - 1] : undefined;
-    const next = text[idx + mention.length];
-    if (!isTelegramMentionWordChar(prev) && !isTelegramMentionWordChar(next)) {
-      return true;
-    }
-    startIndex = idx + 1;
-  }
-  return false;
-}
-
 export function hasBotMention(msg: Message, botUsername: string) {
-  const { text, entities } = getTelegramTextParts(msg);
-  const mention = `@${botUsername}`.toLowerCase();
-  if (hasStandaloneTelegramMention(text.toLowerCase(), mention)) {
+  const text = (msg.text ?? msg.caption ?? "").toLowerCase();
+  if (text.includes(`@${botUsername}`)) {
     return true;
   }
+  const entities = msg.entities ?? msg.caption_entities ?? [];
   for (const ent of entities) {
     if (ent.type !== "mention") {
       continue;
     }
-    const slice = text.slice(ent.offset, ent.offset + ent.length);
-    if (slice.toLowerCase() === mention) {
+    const slice = (msg.text ?? msg.caption ?? "").slice(ent.offset, ent.offset + ent.length);
+    if (slice.toLowerCase() === `@${botUsername}`) {
       return true;
     }
   }

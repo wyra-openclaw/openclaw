@@ -1,7 +1,6 @@
 import type { Client } from "@buape/carbon";
 import type { GatewayPlugin } from "@buape/carbon/gateway";
 import { createArmableStallWatchdog } from "../../channels/transport/stall-watchdog.js";
-import { createConnectedChannelStatusPatch } from "../../gateway/channel-status-patches.js";
 import { danger } from "../../globals.js";
 import type { RuntimeEnv } from "../../runtime.js";
 import { attachDiscordGatewayLogging } from "../gateway-logging.js";
@@ -181,7 +180,8 @@ export async function runDiscordGatewayLifecycle(params: {
     let sawConnected = gateway?.isConnected === true;
     if (sawConnected) {
       pushStatus({
-        ...createConnectedChannelStatusPatch(at),
+        connected: true,
+        lastConnectedAt: at,
         lastDisconnect: null,
       });
     }
@@ -194,7 +194,9 @@ export async function runDiscordGatewayLifecycle(params: {
       const connectedAt = Date.now();
       reconnectStallWatchdog.disarm();
       pushStatus({
-        ...createConnectedChannelStatusPatch(connectedAt),
+        connected: true,
+        lastEventAt: connectedAt,
+        lastConnectedAt: connectedAt,
         lastDisconnect: null,
       });
       if (helloConnectedPollId) {
@@ -251,7 +253,9 @@ export async function runDiscordGatewayLifecycle(params: {
   if (gateway?.isConnected && !lifecycleStopping) {
     const at = Date.now();
     pushStatus({
-      ...createConnectedChannelStatusPatch(at),
+      connected: true,
+      lastEventAt: at,
+      lastConnectedAt: at,
       lastDisconnect: null,
     });
   }
