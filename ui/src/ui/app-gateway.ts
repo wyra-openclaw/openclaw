@@ -2,6 +2,7 @@ import {
   GATEWAY_EVENT_UPDATE_AVAILABLE,
   type GatewayUpdateAvailableEventPayload,
 } from "../../../src/gateway/events.js";
+import { ConnectErrorDetailCodes } from "../../../src/gateway/protocol/connect-error-details.js";
 import { CHAT_SESSIONS_ACTIVE_MINUTES, flushChatQueueForEvent } from "./app-chat.ts";
 import type { EventLogEntry } from "./app-events.ts";
 import {
@@ -233,7 +234,10 @@ export function connectGateway(host: GatewayHost) {
         (typeof error?.code === "string" ? error.code : null);
       if (code !== 1012) {
         if (error?.message) {
-          host.lastError = error.message;
+          host.lastError =
+            host.lastErrorCode && isGenericBrowserFetchFailure(error.message)
+              ? formatAuthCloseErrorMessage(host.lastErrorCode, error.message)
+              : error.message;
           return;
         }
         host.lastError = `disconnected (${code}): ${reason || "no reason"}`;
@@ -273,22 +277,31 @@ function handleTerminalChatEvent(
   host: GatewayHost,
   payload: ChatEventPayload | undefined,
   state: ReturnType<typeof handleChatEvent>,
-) {
+): boolean {
   if (state !== "final" && state !== "error" && state !== "aborted") {
-    return;
+    return false;
   }
-  resetToolStream(host as unknown as Parameters<typeof resetToolStream>[0]);
+  // Check if tool events were seen before resetting (resetToolStream clears toolStreamOrder).
+  const toolHost = host as unknown as Parameters<typeof resetToolStream>[0];
+  const hadToolEvents = toolHost.toolStreamOrder.length > 0;
+  resetToolStream(toolHost);
   void flushChatQueueForEvent(host as unknown as Parameters<typeof flushChatQueueForEvent>[0]);
   const runId = payload?.runId;
-  if (!runId || !host.refreshSessionsAfterChat.has(runId)) {
-    return;
+  if (runId && host.refreshSessionsAfterChat.has(runId)) {
+    host.refreshSessionsAfterChat.delete(runId);
+    if (state === "final") {
+      void loadSessions(host as unknown as OpenClawApp, {
+        activeMinutes: CHAT_SESSIONS_ACTIVE_MINUTES,
+      });
+    }
   }
-  host.refreshSessionsAfterChat.delete(runId);
-  if (state === "final") {
-    void loadSessions(host as unknown as OpenClawApp, {
-      activeMinutes: CHAT_SESSIONS_ACTIVE_MINUTES,
-    });
+  // Reload history when tools were used so the persisted tool results
+  // replace the now-cleared streaming state.
+  if (hadToolEvents && state === "final") {
+    void loadChatHistory(host as unknown as OpenClawApp);
+    return true;
   }
+  return false;
 }
 
 function handleChatGatewayEvent(host: GatewayHost, payload: ChatEventPayload | undefined) {
@@ -299,8 +312,8 @@ function handleChatGatewayEvent(host: GatewayHost, payload: ChatEventPayload | u
     );
   }
   const state = handleChatEvent(host as unknown as OpenClawApp, payload);
-  handleTerminalChatEvent(host, payload, state);
-  if (state === "final" && shouldReloadHistoryForFinalEvent(payload)) {
+  const historyReloaded = handleTerminalChatEvent(host, payload, state);
+  if (state === "final" && !historyReloaded && shouldReloadHistoryForFinalEvent(payload)) {
     void loadChatHistory(host as unknown as OpenClawApp);
   }
 }
@@ -322,6 +335,17 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       host as unknown as Parameters<typeof handleAgentEvent>[0],
       evt.payload as AgentEventPayload | undefined,
     );
+    // Reload history after each tool result so the persisted text + tool
+    // output replaces any truncated streaming fragments.
+    const agentPayload = evt.payload as AgentEventPayload | undefined;
+    const toolData = agentPayload?.data;
+    if (
+      agentPayload?.stream === "tool" &&
+      typeof toolData?.phase === "string" &&
+      toolData.phase === "result"
+    ) {
+      void loadChatHistory(host as unknown as OpenClawApp);
+    }
     return;
   }
 

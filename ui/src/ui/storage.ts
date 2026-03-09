@@ -1,5 +1,7 @@
 const KEY = "openclaw.control.settings.v1";
 
+type PersistedUiSettings = Omit<UiSettings, "token"> & { token?: never };
+
 import { isSupportedLocale } from "../i18n/index.ts";
 import { inferBasePathFromPathname, normalizeBasePath } from "./navigation.ts";
 import type { ThemeMode } from "./theme.ts";
@@ -105,11 +107,31 @@ export function loadSettings(): UiSettings {
           : defaults.navGroupsCollapsed,
       locale: isSupportedLocale(parsed.locale) ? parsed.locale : undefined,
     };
+    if ("token" in parsed) {
+      persistSettings(settings);
+    }
+    return settings;
   } catch {
     return defaults;
   }
 }
 
 export function saveSettings(next: UiSettings) {
-  localStorage.setItem(KEY, JSON.stringify(next));
+  persistSettings(next);
+}
+
+function persistSettings(next: UiSettings) {
+  const persisted: PersistedUiSettings = {
+    gatewayUrl: next.gatewayUrl,
+    sessionKey: next.sessionKey,
+    lastActiveSessionKey: next.lastActiveSessionKey,
+    theme: next.theme,
+    chatFocusMode: next.chatFocusMode,
+    chatShowThinking: next.chatShowThinking,
+    splitRatio: next.splitRatio,
+    navCollapsed: next.navCollapsed,
+    navGroupsCollapsed: next.navGroupsCollapsed,
+    ...(next.locale ? { locale: next.locale } : {}),
+  };
+  localStorage.setItem(KEY, JSON.stringify(persisted));
 }
